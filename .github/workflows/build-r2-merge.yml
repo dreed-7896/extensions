@@ -7,6 +7,7 @@ on:
       - "scripts/build-r2-merge-apk.sh"
       - "scripts/emit-repo-index.py"
       - "scripts/repo-index/**"
+      - "scripts/r2-signing.jks"
       - ".github/workflows/build-r2-merge.yml"
   workflow_dispatch:
 
@@ -30,6 +31,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # `tools` was removed from the SDK repo; default packages still try to install it.
+          packages: platform-tools
 
       - name: Install Android platform 37
         run: |
