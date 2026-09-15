@@ -4,11 +4,11 @@ Mihon / TachiManga / Tachiyomi extension. Reads a Cloudflare R2 bucket.
 
 Package: `eu.kanade.tachiyomi.extension.all.r2merge` (in-place update of R2 Merge — credentials persist).
 
-Lib **1.4**, `1.4.12`. NSFW.
+Lib **1.4**, `1.4.13`. NSFW.
 
 ## Bucket layout
 
-Each folder under the root prefix is a title. Mix any of: image folders, `.cbz`/`.zip`, and chapter URLs in `details.json` (or a separate `chapters.json`).
+Each folder under the root prefix is a title. Use image folders / `.cbz`/`.zip`, **or** chapter URLs in `details.json` (or a separate `chapters.json`). If `chapters[]` expands to anything, that list is the whole series — folder/cbz chapters in the same prefix are ignored.
 
 ```text
 <title-id>/
@@ -51,7 +51,7 @@ R2 Library on Suwatte is **2.0**. Update the list in-app after adding. Library b
 }
 ```
 
-Bucket zip/folder chapters are picked up automatically and listed **with** JSON chapters. JSON `chapters[]` are **sources in order**: a gallery URL is one chapter; a NovelCrow / AllPornComic / MangaDex series URL expands to **every** chapter on that title (optional `chapterRange`, blank = all, including chapters that show up later). Display numbers are then 1, 2, 3… so two sources that both have a “chapter 1” both appear. `"titles"` on a series row renames by **that site’s chapter numbers**. Replace `details.json` in the bucket to update the list. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
+JSON `chapters[]` are **sources in order**: a gallery URL is one chapter; a NovelCrow / AllPornComic / MangaDex series URL expands to **every** chapter on that title (optional `chapterRange`, blank = all, including chapters that show up later). Display numbers are then 1, 2, 3… so two sources that both have a “chapter 1” both appear. `"titles"` on a series row renames by **that site’s chapter numbers**. Replace `details.json` in the bucket to update the list. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
 
 Gallery hosts: nhentai, HentaiRead, HentaiNexus, Hentai2Read, PandaChaika, E-Hentai / ExHentai, Hitomi, NovelCrow, AllPornComic, MangaDex. Series URLs: `https://novelcrow.com/comic/slug/`, `https://allporncomic.com/porncomic/slug/`, `https://mangadex.org/title/{uuid}/…` (MangaDex prefers English when the same number exists in multiple languages). Madara sites may need a one-time Cloudflare solve in WebView.
 
@@ -71,9 +71,9 @@ TachiManga wants **index.pb**:
 https://github.com/raahat-hossain/extensions/raw/cursor/r2-merge-extension-8f4a/repo/index.pb
 ```
 
-Sideload: [`repo/apk/tachiyomi-all.r2merge-v1.4.12.apk`](repo/apk/tachiyomi-all.r2merge-v1.4.12.apk)
+Sideload: [`repo/apk/tachiyomi-all.r2merge-v1.4.13.apk`](repo/apk/tachiyomi-all.r2merge-v1.4.13.apk)
 
-1.4.11 was signed with a throwaway debug cert, so TachiManga hides the update. Uninstall R2 Library, remove the repo, re-add `index.pb`, install **1.4.12**. Later updates keep this key.
+1.4.11 was signed with a throwaway debug cert, so TachiManga hides the update. Uninstall R2 Library, remove the repo, re-add `index.pb`, install **1.4.13**. Later updates keep this key.
 
 Settings: Account ID, Access Key, Secret, Bucket. Root Prefix empty if titles sit at bucket root. Optional public image URL (r2.dev / custom domain).
 

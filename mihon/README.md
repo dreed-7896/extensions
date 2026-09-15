@@ -1,8 +1,8 @@
 # R2 Library — Mihon / TachiManga / Tachiyomi extension
 
-Kotlin `HttpSource` (lib **1.4**, `1.4.12`). Display name **R2 Library**. Package stays `eu.kanade.tachiyomi.extension.all.r2merge` so existing installs update.
+Kotlin `HttpSource` (lib **1.4**, `1.4.13`). Display name **R2 Library**. Package stays `eu.kanade.tachiyomi.extension.all.r2merge` so existing installs update.
 
-One R2 bucket. Chapters are **folder images**, **.cbz/.zip** (HTTP range), and/or **chapters.json** gallery/remote-archive/page-list entries.
+One R2 bucket. Chapters are **folder images**, **.cbz/.zip** (HTTP range), **or** `chapters.json` gallery/remote-archive/page-list entries. A non-empty JSON `chapters[]` replaces folder/cbz for that series.
 
 ## R2 layout
 
@@ -15,7 +15,7 @@ One R2 bucket. Chapters are **folder images**, **.cbz/.zip** (HTTP range), and/o
   Chapter 002.cbz   # archive
 ```
 
-`chapters.json` (merged with whatever is already in the folder):
+`chapters.json` (replaces folder/cbz chapters for that series when the list is non-empty):
 
 ```json
 {
@@ -36,7 +36,7 @@ One R2 bucket. Chapters are **folder images**, **.cbz/.zip** (HTTP range), and/o
 https://github.com/raahat-hossain/extensions/raw/cursor/r2-merge-extension-8f4a/repo/index.pb
 ```
 
-Or sideload `repo/apk/tachiyomi-all.r2merge-v1.4.12.apk`. Settings: account id / access key / secret / bucket.
+Or sideload `repo/apk/tachiyomi-all.r2merge-v1.4.13.apk`. Settings: account id / access key / secret / bucket.
 
 `details.json` `"cover"`: absolute URL, `"Chapter 1_1"` (chapter title + 1-based page — folder, `.cbz`, or `chapters.json` gallery), `"chapter 4_24.png"` (page filename), or a relative image key.
 

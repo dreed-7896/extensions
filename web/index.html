@@ -30,6 +30,7 @@
       --radius: 16px;
     }
     * { box-sizing: border-box; }
+    html { color-scheme: dark; }
     html, body { margin: 0; background: var(--bg); color: var(--text); }
     body {
       font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
@@ -68,9 +69,6 @@
     textarea { min-height: 88px; resize: vertical; }
     input:focus, textarea:focus, select:focus { border-color: var(--accent); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 520px) {
-      .row { grid-template-columns: 1fr; }
-    }
     .hint { color: var(--muted); font-size: 0.78rem; margin-top: 6px; }
     .cover-row { display: flex; gap: 8px; }
     .cover-row input { flex: 1; }
@@ -97,12 +95,16 @@
     .chapter-head {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
+    .chapter-tools { display: flex; gap: 6px; flex: none; }
+    .grow { flex: 1; }
     .idx {
-      width: 28px;
+      min-width: 28px;
       height: 28px;
+      padding: 0 8px;
       border-radius: 8px;
       background: #2a2344;
       color: var(--accent-2);
@@ -112,57 +114,46 @@
       font-weight: 700;
       flex: none;
     }
-    .ch-num {
-      width: 64px;
-      flex: none;
-      text-align: center;
-      padding: 10px 6px;
-      font-variant-numeric: tabular-nums;
-      font-weight: 700;
-      color: var(--accent-2);
-      background: #2a2344;
-    }
-    input.ch-num::-webkit-outer-spin-button,
-    input.ch-num::-webkit-inner-spin-button { appearance: none; margin: 0; }
-    input.ch-num[type=number] { appearance: textfield; }
-    .check-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-top: 12px;
-    }
-    .check-row input[type=checkbox] {
-      width: 20px;
-      height: 20px;
-      margin: 2px 0 0;
-      accent-color: var(--accent);
-      flex: none;
-    }
-    .check-row span { color: var(--text); font-size: 0.92rem; }
-    .chapter .grow { flex: 1; }
-    .chapter-meta {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .chapter-meta .ch-title {
-      width: auto;
+    .url-field { margin: 0 0 10px; }
+    .ch-url {
+      width: 100%;
       min-width: 0;
-      flex: 1;
+      min-height: 52px;
+      font-size: 16px;
+      line-height: 1.3;
+      background: #08080c;
+      color: #fafafa;
+      border: 1.5px solid #6a6a78;
+      padding: 14px 12px;
+      border-radius: 12px;
     }
-    .ch-pages {
-      width: 92px;
-      flex: none;
-      text-align: center;
-      padding: 10px 8px;
-      font-variant-numeric: tabular-nums;
+    .ch-url::placeholder { color: #8a8a94; }
+    .ch-url:focus {
+      border-color: var(--accent-2);
+      background: #101018;
+      box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.22);
     }
-    .ch-range {
-      width: 88px;
-      flex: none;
-      text-align: center;
-      padding: 10px 8px;
-      font-variant-numeric: tabular-nums;
+    .mini {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+    .mini > span {
+      font-size: 0.7rem;
+      color: #b4b4bc;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .chapter-fields {
+      display: grid;
+      gap: 10px;
+      margin-top: 2px;
+    }
+    .chapter-fields.pair { grid-template-columns: 1fr 1fr; }
+    @media (max-width: 520px) {
+      .row { grid-template-columns: 1fr; }
+      .chapter-fields.pair { grid-template-columns: 1fr; }
     }
     .ch-names {
       margin-top: 8px;
@@ -178,11 +169,11 @@
     .ch-name-row .idx { width: 36px; font-size: 0.72rem; }
     .ch-titles-spec { margin-top: 8px; }
     .icon-btn {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       padding: 0;
-      background: transparent;
-      color: var(--muted);
+      background: #16161c;
+      color: var(--text);
       border: 1px solid var(--line);
       border-radius: 10px;
       flex: none;
@@ -301,8 +292,8 @@
 
   <section>
     <h2>Chapters</h2>
-    <p class="hint">Sources in list order. A gallery URL is one chapter. A NovelCrow / AllPornComic / MangaDex series URL expands to <strong>every</strong> chapter on that title. Blank <code>Ch.</code> = all, including chapters that show up later. Replacing <code>details.json</code> in the bucket is the whole update.</p>
-    <p class="hint"><code>Ch.</code> (series only): <code>2-</code> = from 2 through newest, <code>2-10</code> = those chapters, <code>5</code> = only 5. Name fields use that source’s chapter numbers. <code>Pages</code> crops images: <code>50</code> / <code>3-50</code> / <code>3-</code>.</p>
+    <p class="hint">List order = chapter order. Gallery URL = one chapter. Series URL (NovelCrow / AllPornComic / MangaDex title) = every chapter. Blank <code>Ch.</code> = all, including new ones later.</p>
+    <p class="hint">Series <code>Ch.</code>: <code>2-</code> from 2, <code>2-10</code> those, <code>5</code> only 5. Names use that source’s numbers. <code>Pages</code> crops images.</p>
     <div id="chapters"></div>
     <div class="add-row">
       <button class="add" type="button" id="addBtn">+ Chapter</button>
@@ -645,23 +636,32 @@
     const renderChapters = () => {
       $("chapters").innerHTML = chapters.map((ch, i) => {
         const series = isSeriesUrl(ch.url);
-        const noUrl = !String(ch.url || "").trim();
         return `
         <div class="chapter" data-i="${i}">
           <div class="chapter-head">
             <span class="idx">${i + 1}</span>
-            ${noUrl ? `<input class="ch-num" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" value="${chapterNumber(ch) || ""}" />` : ""}
-            <input class="grow ch-url" data-i="${i}" placeholder="https://…  or  Chapter 001.cbz" value="${escapeAttr(ch.url)}" />
-            <button class="icon-btn" type="button" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
-            <button class="icon-btn" type="button" data-down="${i}" ${i === chapters.length - 1 ? "disabled" : ""}>↓</button>
-            <button class="icon-btn danger" type="button" data-del="${i}">✕</button>
+            <div class="chapter-tools">
+              <button class="icon-btn" type="button" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+              <button class="icon-btn" type="button" data-down="${i}" ${i === chapters.length - 1 ? "disabled" : ""}>↓</button>
+              <button class="icon-btn danger" type="button" data-del="${i}">✕</button>
+            </div>
           </div>
-          <div class="chapter-meta">
-            ${series ? "" : `<input class="ch-title" data-i="${i}" placeholder="Optional chapter name" value="${escapeAttr(ch.title)}" />`}
-            ${series ? `<input class="ch-range" data-i="${i}" placeholder="all" value="${escapeAttr(ch.chapterRange)}" title="Chapter range: blank = all, 2- = from 2, 2-10 = those chapters" />` : ""}
-            <input class="ch-pages" data-i="${i}" placeholder="3-50" value="${escapeAttr(ch.pageRange)}" title="Pages: 50 = first 50, 3-50 = those pages" />
+          <label class="mini url-field">
+            <span>Link</span>
+            <input class="ch-url" data-i="${i}" inputmode="url" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="https://…" value="${escapeAttr(ch.url)}" />
+          </label>
+          ${series ? `
+          <div class="chapter-fields pair">
+            <label class="mini"><span>Ch. range</span><input class="ch-range" data-i="${i}" placeholder="all" value="${escapeAttr(ch.chapterRange)}" /></label>
+            <label class="mini"><span>Pages</span><input class="ch-pages" data-i="${i}" placeholder="optional" value="${escapeAttr(ch.pageRange)}" /></label>
           </div>
-          ${series ? renderNames(ch, i) : ""}
+          ${renderNames(ch, i)}
+          ` : `
+          <div class="chapter-fields">
+            <label class="mini"><span>Name</span><input class="ch-title" data-i="${i}" placeholder="Optional" value="${escapeAttr(ch.title)}" /></label>
+            <label class="mini"><span>Pages</span><input class="ch-pages" data-i="${i}" placeholder="optional" value="${escapeAttr(ch.pageRange)}" /></label>
+          </div>
+          `}
         </div>`;
       }).join("");
       updatePreview();
@@ -811,7 +811,6 @@
         chapters[i].url = e.target.value;
       }
       if (e.target.classList.contains("ch-title")) chapters[i].title = e.target.value;
-      if (e.target.classList.contains("ch-num")) chapters[i].number = asNumber(e.target.value);
       if (e.target.classList.contains("ch-pages")) chapters[i].pageRange = e.target.value;
       if (e.target.classList.contains("ch-range")) chapters[i].chapterRange = e.target.value;
       if (e.target.classList.contains("ch-name")) {

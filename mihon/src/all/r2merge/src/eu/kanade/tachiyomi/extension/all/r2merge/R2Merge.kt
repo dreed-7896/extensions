@@ -441,23 +441,22 @@ class R2Merge(
     ): JsonChapterListing {
         val direct = listing.objects.filter { it.key.isChildOf(seriesPrefix) }
         val chapters = mutableListOf<ParsedChapter>()
-        var overlay = false
         direct.firstOrNull { it.key.fileName().equals("details.json", true) }?.let { obj ->
             fetchText(config, obj)?.let { body ->
-                overlay = overlay || overlayFlag(body, json)
                 chapters += parseChaptersJson(body, json, seriesPrefix)
             }
         }
         direct.firstOrNull { isChaptersJson(it.key) }?.let { obj ->
             fetchText(config, obj)?.let { body ->
-                overlay = overlay || overlayFlag(body, json)
                 chapters += parseChaptersJson(body, json, seriesPrefix)
             }
         }
-        return JsonChapterListing(overlay = overlay, chapters = chapters)
+        return JsonChapterListing(chapters = chapters)
     }
 
-    private fun composeJsonChapters(listed: JsonChapterListing): Pair<List<ParsedChapter>, List<ParsedChapter>> = concatenateSources(listed.chapters, ::fetchSeriesChapters)
+    /** Expand each source in list order, then concatenate. */
+    private fun composeJsonChapters(listed: JsonChapterListing): List<ParsedChapter> =
+        concatenateSources(listed.chapters, ::fetchSeriesChapters).first
 
     private fun fetchSeriesChapters(url: String): List<ParsedChapter> {
         val key = normalizeSeriesCacheKey(url)
@@ -478,7 +477,7 @@ class R2Merge(
         listing: S3Listing,
         ref: CoverPageRef,
     ): String? {
-        val chapters = composeJsonChapters(jsonListedChapters(config, listing, seriesPrefix)).first
+        val chapters = composeJsonChapters(jsonListedChapters(config, listing, seriesPrefix))
         val chapter = findChapterByName(chapters, ref.chapter) { it.title } ?: return null
         val pages = pagesForCover(chapter.readerUrl())
         val imageUrl = pickCoverPage(pages, ref.page, preserveOrder = true) { it.imageUrl.orEmpty() }
@@ -578,13 +577,9 @@ class R2Merge(
         }
 
         val listed = jsonListedChapters(config, tree, prefix)
-        val (composed, leftover) = composeJsonChapters(listed)
-        val extras = composed + leftover
-        val merged = if (listed.overlay) {
-            mergeChapterLists(chapters, extras)
-        } else {
-            (chapters + composed).distinctBy { it.readerUrl() }
-        }
+        val composed = composeJsonChapters(listed)
+        // Non-empty JSON chapters replace folder/cbz for this series.
+        val merged = if (composed.isNotEmpty()) composed else chapters
 
         if (merged.isEmpty()) {
             throw IOException(

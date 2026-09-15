@@ -34,74 +34,14 @@ internal data class ParsedChapter(
 internal fun ParsedChapter.resolvedSourceNumber(): Float = if (sourceNumber > 0f) sourceNumber else number
 
 internal class JsonChapterListing(
-    val overlay: Boolean,
     val chapters: List<ParsedChapter>,
 )
-
-/**
- * JSON chapters with an explicit number replace every bucket chapter that already
- * uses that number; any other JSON chapter is appended. URL fingerprints still
- * drop exact duplicates. Without [overlay], callers should concat + distinctBy url.
- */
-internal fun mergeChapterLists(
-    base: List<ParsedChapter>,
-    overlay: List<ParsedChapter>,
-): List<ParsedChapter> {
-    val merged = base.toMutableList()
-    val seen = merged.map { it.readerUrl() }.toMutableSet()
-    for (chapter in overlay) {
-        val replace = chapter.explicitNumber && chapter.number > 0f
-        if (replace) {
-            val targets = merged.indices.filter { merged[it].number == chapter.number }
-            if (targets.isNotEmpty()) {
-                val keep = targets.first()
-                val incoming = if (chapter.url.isBlank()) {
-                    val baseChapter = merged[keep]
-                    baseChapter.copy(
-                        title = chapter.title.ifBlank { baseChapter.title },
-                        scanlator = chapter.scanlator ?: baseChapter.scanlator,
-                        pageRange = chapter.pageRange ?: baseChapter.pageRange,
-                        explicitNumber = true,
-                    )
-                } else {
-                    chapter
-                }
-                for (index in targets.asReversed()) {
-                    seen.remove(merged[index].readerUrl())
-                    if (index == keep) {
-                        merged[index] = incoming
-                        seen += incoming.readerUrl()
-                    } else {
-                        merged.removeAt(index)
-                    }
-                }
-                continue
-            }
-        }
-        if (chapter.url.isBlank()) continue
-        val key = chapter.readerUrl()
-        if (key in seen) continue
-        merged += chapter
-        seen += key
-    }
-    return merged
-}
-
-internal fun overlayFlag(body: String, json: Json): Boolean {
-    val parsed = runCatching {
-        json.parseToJsonElement(body.trim().removePrefix("\uFEFF"))
-    }.getOrNull() as? JsonObject ?: return false
-    return listOf("chaptersOverlay", "overlay").any { key ->
-        (parsed[key] as? JsonPrimitive)?.contentOrNull.equals("true", true)
-    }
-}
 
 /**
  * JSON order is source order. Series URLs expand (optional [ParsedChapter.chapterRange],
  * default all, including chapters that appear later). Singles stay one chapter.
  * Display numbers are then 1..N in that order so sources never steal each other's
- * chapter 1. Title-only / pageRange-only rows with a number patch the composed list
- * or leftover R2 folders.
+ * chapter 1. Title-only / pageRange-only rows with a number patch the composed list.
  */
 internal fun concatenateSources(
     specs: List<ParsedChapter>,
