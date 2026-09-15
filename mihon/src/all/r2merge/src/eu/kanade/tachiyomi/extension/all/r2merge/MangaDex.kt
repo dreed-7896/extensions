@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.extension.all.r2merge
 
+import eu.kanade.tachiyomi.extension.all.r2merge.meta.SeriesMetadata
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.Page
 import kotlinx.serialization.json.Json
@@ -17,7 +18,7 @@ import java.time.Instant
 internal const val MANGADEX_SITE = "https://mangadex.org"
 internal const val MANGADEX_API = "https://api.mangadex.org"
 internal const val MANGADEX_USER_AGENT =
-    "R2Library/1.4.10 (https://github.com/raahat-hossain/extensions)"
+    "R2Library/1.4.12 (https://github.com/raahat-hossain/extensions)"
 
 private val UUID_RE = Regex(
     """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""",
@@ -196,6 +197,7 @@ private fun dedupeMangaDexChapters(chapters: List<MdFeedChapter>): List<ParsedCh
             scanlator = best.group?.takeIf { it.isNotBlank() } ?: "MangaDex",
             dateUpload = best.dateUpload,
             explicitNumber = number > 0f,
+            sourceNumber = number,
         )
     }
 }
@@ -246,6 +248,99 @@ private fun feedUrl(mangaId: String, offset: Int, limit: Int): String {
         builder.addQueryParameter("contentRating[]", rating)
     }
     return builder.build().toString()
+}
+
+internal fun fetchMangaDexMetadata(
+    client: OkHttpClient,
+    headers: Headers,
+    seriesUrl: String,
+    json: Json,
+): SeriesMetadata {
+    val mangaId = SERIES_PATH.find(
+        seriesUrl.trim().substringBefore('?').substringBefore('#'),
+    )?.groupValues?.get(1)
+        ?: mangaDexIdFromUrl(seriesUrl)
+    val body = fetchMangaDex(
+        client,
+        mangaDexMangaUrl(mangaId),
+        mangaDexHeaders(headers),
+    )
+    return parseMangaDexManga(body, json, mangaId)
+}
+
+internal fun parseMangaDexManga(body: String, json: Json, mangaId: String): SeriesMetadata {
+    val root = json.parseToJsonElement(body) as? JsonObject
+        ?: throw IOException("MangaDex manga: not JSON")
+    val result = (root["result"] as? JsonPrimitive)?.contentOrNull
+    if (result != null && result != "ok") {
+        throw IOException("MangaDex manga $result")
+    }
+    val data = root["data"] as? JsonObject ?: throw IOException("MangaDex manga missing data")
+    val attrs = data["attributes"] as? JsonObject
+    val titleMap = attrs?.get("title") as? JsonObject
+    val title = localizedMangaDexText(titleMap)
+        ?: localizedMangaDexText(attrs?.get("altTitles") as? JsonArray)
+    val description = localizedMangaDexText(attrs?.get("description") as? JsonObject)
+    val status = SeriesMetadata.statusOf((attrs?.get("status") as? JsonPrimitive)?.contentOrNull)
+    val author = relationshipNames(data["relationships"] as? JsonArray, "author")
+    val artist = relationshipNames(data["relationships"] as? JsonArray, "artist")
+    val coverFile = coverFileName(data["relationships"] as? JsonArray)
+    val cover = coverFile?.let { "https://uploads.mangadex.org/covers/$mangaId/$it" }
+    return SeriesMetadata(
+        title = title,
+        author = author,
+        artist = artist,
+        description = description,
+        status = status,
+        cover = cover,
+    )
+}
+
+private fun mangaDexMangaUrl(mangaId: String): String {
+    val builder = "$MANGADEX_API/manga/$mangaId".toHttpUrl().newBuilder()
+        .addQueryParameter("includes[]", "cover_art")
+        .addQueryParameter("includes[]", "author")
+        .addQueryParameter("includes[]", "artist")
+    return builder.build().toString()
+}
+
+private fun localizedMangaDexText(map: JsonObject?): String? {
+    if (map == null) return null
+    listOf("en", "en-us", "ja-ro", "ja", "ko", "zh").forEach { lang ->
+        (map[lang] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    }
+    return map.values.firstOrNull { it is JsonPrimitive }
+        ?.let { (it as JsonPrimitive).contentOrNull?.trim()?.takeIf { text -> text.isNotEmpty() } }
+}
+
+private fun localizedMangaDexText(alts: JsonArray?): String? {
+    if (alts == null) return null
+    for (entry in alts) {
+        localizedMangaDexText(entry as? JsonObject)?.let { return it }
+    }
+    return null
+}
+
+private fun relationshipNames(relationships: JsonArray?, type: String): String? {
+    if (relationships == null) return null
+    val names = relationships.mapNotNull { entry ->
+        val obj = entry as? JsonObject ?: return@mapNotNull null
+        if ((obj["type"] as? JsonPrimitive)?.contentOrNull != type) return@mapNotNull null
+        ((obj["attributes"] as? JsonObject)?.get("name") as? JsonPrimitive)?.contentOrNull
+            ?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    return names.joinToString().takeIf { it.isNotEmpty() }
+}
+
+private fun coverFileName(relationships: JsonArray?): String? {
+    if (relationships == null) return null
+    for (entry in relationships) {
+        val obj = entry as? JsonObject ?: continue
+        if ((obj["type"] as? JsonPrimitive)?.contentOrNull != "cover_art") continue
+        val name = ((obj["attributes"] as? JsonObject)?.get("fileName") as? JsonPrimitive)?.contentOrNull
+        if (!name.isNullOrBlank()) return name
+    }
+    return null
 }
 
 private fun fetchMangaDex(client: OkHttpClient, url: String, headers: Headers): String {

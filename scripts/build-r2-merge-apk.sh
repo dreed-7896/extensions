@@ -50,6 +50,18 @@ PY
 
 printf 'sdk.dir=%s\n' "$ANDROID_SDK" > "$YUZONO/local.properties"
 
+KEYSTORE="$ROOT/scripts/r2-signing.jks"
+if [[ ! -f "$KEYSTORE" ]]; then
+  echo "Missing $KEYSTORE — generate it with keytool before building." >&2
+  exit 1
+fi
+cp -f "$KEYSTORE" "$YUZONO/signingkey.jks"
+cp -f "$KEYSTORE" "$YUZONO/src/all/r2merge/signingkey.jks"
+export KEY_STORE_PASSWORD="${KEY_STORE_PASSWORD:-r2library}"
+export ALIAS="${ALIAS:-r2library}"
+export KEY_ALIAS="${KEY_ALIAS:-r2library}"
+export KEY_PASSWORD="${KEY_PASSWORD:-r2library}"
+
 (
   cd "$YUZONO"
   ./gradlew :src:all:r2merge:assembleRelease --no-daemon --stacktrace

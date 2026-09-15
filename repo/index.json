@@ -1,7 +1,7 @@
 {
   "name": "R2 Library",
   "badgeLabel": "R2",
-  "signingKey": "3a0c314cfb86ff9b30ecdfc203ae3efaa1585bcb30b1b3f15a65286c429bcaee",
+  "signingKey": "3a6e16769f64921128875f1967c28905262477dd8201bdb11877ea8b6e8116de",
   "contact": {
     "website": "https://github.com/raahat-hossain/extensions"
   },
@@ -11,13 +11,13 @@
         "name": "R2 Library",
         "packageName": "eu.kanade.tachiyomi.extension.all.r2merge",
         "resources": {
-          "apkUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/apk/tachiyomi-all.r2merge-v1.4.11.apk",
+          "apkUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/apk/tachiyomi-all.r2merge-v1.4.12.apk",
           "iconUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/icon/eu.kanade.tachiyomi.extension.all.r2merge.png",
-          "jarUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/jar/tachiyomi-all.r2merge-v1.4.11.jar"
+          "jarUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/jar/tachiyomi-all.r2merge-v1.4.12.jar"
         },
         "extensionLib": "1.4",
-        "versionCode": "11",
-        "versionName": "1.4.11",
+        "versionCode": "12",
+        "versionName": "1.4.12",
         "contentWarning": "CONTENT_WARNING_NSFW",
         "sources": [
           {

@@ -23,6 +23,20 @@ data class SeriesMetadata(
     val status: Int = SManga.UNKNOWN,
     val cover: String? = null,
 ) {
+    /** Local details.json / ComicInfo wins; remote series pages fill blanks. */
+    fun overlay(remote: SeriesMetadata?): SeriesMetadata {
+        if (remote == null) return this
+        return copy(
+            title = title ?: remote.title,
+            author = author ?: remote.author,
+            artist = artist ?: remote.artist,
+            description = description ?: remote.description,
+            genre = genre ?: remote.genre,
+            status = if (status != SManga.UNKNOWN) status else remote.status,
+            cover = cover ?: remote.cover,
+        )
+    }
+
     companion object {
         const val DETAILS_JSON = "details.json"
         const val COMIC_INFO_XML = "comicinfo.xml"

@@ -36,9 +36,65 @@ internal fun parsePageRangeSpec(raw: String?): PageRange? {
     return PageRange(1, count)
 }
 
+/** 1-based inclusive chapter window. [end] null means through the newest chapter. */
+internal data class ChapterRange(
+    val start: Float,
+    val end: Float?,
+) {
+    fun spec(): String = when {
+        end == null -> formatBound(start) + "-"
+        start == end -> formatBound(start)
+        else -> "${formatBound(start)}-${formatBound(end)}"
+    }
+
+    fun contains(number: Float): Boolean {
+        if (number <= 0f) return false
+        if (number + 1e-4f < start) return false
+        val cap = end ?: return true
+        return number <= cap + 1e-4f
+    }
+
+    private fun formatBound(value: Float): String {
+        val asInt = value.toInt()
+        return if (value == asInt.toFloat()) asInt.toString() else value.toString()
+    }
+}
+
+private val CHAPTER_SPAN = Regex("""^(\d+(?:\.\d+)?)?-(\d+(?:\.\d+)?)?$""")
+
+internal fun parseChapterRangeSpec(raw: String?): ChapterRange? {
+    val value = raw?.trim()?.replace(" ", "") ?: return null
+    if (value.isEmpty()) return null
+    CHAPTER_SPAN.matchEntire(value)?.let { match ->
+        val start = match.groupValues[1].toFloatOrNull()?.takeIf { it > 0f } ?: 1f
+        val end = match.groupValues[2].toFloatOrNull()
+        if (end != null && end < start) return null
+        return ChapterRange(start, end)
+    }
+    val single = value.toFloatOrNull() ?: return null
+    if (single <= 0f) return null
+    return ChapterRange(single, single)
+}
+
+internal fun chapterRangeFromJson(obj: JsonObject?, seriesUrl: Boolean): ChapterRange? {
+    if (obj == null) return null
+    val keys = buildList {
+        add("chapterRange")
+        add("chaptersRange")
+        add("chapter_range")
+        if (seriesUrl) add("range")
+    }
+    keys.forEach { key ->
+        val primitive = obj[key] as? JsonPrimitive ?: return@forEach
+        primitive.contentOrNull?.let { parseChapterRangeSpec(it) }?.let { return it }
+        primitive.intOrNull?.let { parseChapterRangeSpec(it.toString()) }?.let { return it }
+    }
+    return null
+}
+
 internal fun pageRangeFromJson(obj: JsonObject?): PageRange? {
     if (obj == null) return null
-    listOf("pageRange", "pagerange", "pagesRange", "range").forEach { key ->
+    listOf("pageRange", "pagerange", "pagesRange").forEach { key ->
         val primitive = obj[key] as? JsonPrimitive ?: return@forEach
         primitive.contentOrNull?.let { parsePageRangeSpec(it) }?.let { return it }
         primitive.intOrNull?.let { parsePageRangeSpec(it.toString()) }?.let { return it }

@@ -9,6 +9,7 @@ internal enum class SiteId {
     EHentai,
     Hitomi,
     NovelCrow,
+    AllPornComic,
     MangaDex,
     ;
 
@@ -21,6 +22,7 @@ internal enum class SiteId {
         EHentai -> "ehentai"
         Hitomi -> "hitomi"
         NovelCrow -> "novelcrow"
+        AllPornComic -> "allporncomic"
         MangaDex -> "mangadex"
     }
 }
@@ -50,6 +52,9 @@ internal fun normalizeSite(value: String?): SiteId? {
         "ehentai", "e-hentai", "eh", "exhentai", "ex", "e-hentai.org", "exhentai.org" -> SiteId.EHentai
         "hitomi", "hitomi.la" -> SiteId.Hitomi
         "novelcrow", "nc", "novel-crow", "novelcrow.com" -> SiteId.NovelCrow
+        "allporncomic", "allporncomics", "apc", "all-porn-comic",
+        "allporncomic.com", "allporncomics.com",
+        -> SiteId.AllPornComic
         "mangadex", "md", "manga-dex", "mangadex.org" -> SiteId.MangaDex
         else -> null
     }
@@ -70,6 +75,8 @@ internal fun siteFromHost(host: String): SiteId? {
         h == "hitomi.la" || h.endsWith(".hitomi.la") ||
             h == HITOMI_CDN || h.endsWith(".$HITOMI_CDN") -> SiteId.Hitomi
         h == "novelcrow.com" || h.endsWith(".novelcrow.com") -> SiteId.NovelCrow
+        h == "allporncomic.com" || h.endsWith(".allporncomic.com") ||
+            h == "allporncomics.com" || h.endsWith(".allporncomics.com") -> SiteId.AllPornComic
         h == "mangadex.org" || h.endsWith(".mangadex.org") ||
             h == "mangadex.network" || h.endsWith(".mangadex.network") -> SiteId.MangaDex
         else -> null
@@ -100,7 +107,7 @@ internal fun identifySite(url: String, explicit: String? = null): SiteId {
     throw Exception(
         "Unknown chapter host \"${hostOf(url).ifBlank { url }}\". " +
             "Set source to nhentai, hentairead, hentainexus, hentai2read, " +
-            "pandachaika, ehentai, hitomi, novelcrow, or mangadex — or use a .cbz/.zip / folder chapter.",
+            "pandachaika, ehentai, hitomi, novelcrow, allporncomic, or mangadex — or use a .cbz/.zip / folder chapter.",
     )
 }
 
@@ -155,11 +162,9 @@ internal fun extractRemoteId(site: SiteId, url: String): String {
                     ?.groupValues?.get(1)
                 ?: Regex("""\b(\d{3,})\b""").find(trimmed)?.groupValues?.get(1)
                 ?: throw Exception("Could not parse hitomi id from $trimmed")
-        SiteId.NovelCrow -> {
-            val path = trimmed.replace(Regex("""[?#].*$"""), "").trimEnd('/')
-                .replace(Regex("""^https?://[^/]+""", RegexOption.IGNORE_CASE), "")
-                .trim('/')
-            path.ifBlank { throw Exception("Could not parse novelcrow path from $trimmed") }
+        SiteId.NovelCrow, SiteId.AllPornComic -> {
+            madaraRelativePath(trimmed)
+                .ifBlank { throw Exception("Could not parse ${site.label()} path from $trimmed") }
         }
         SiteId.MangaDex -> mangaDexIdFromUrl(trimmed)
     }
@@ -174,6 +179,11 @@ internal fun canonicalUrl(site: SiteId, remoteId: String): String = when (site) 
     SiteId.EHentai -> ehentaiGalleryUrl(remoteId, EHENTAI_BASE)
     SiteId.Hitomi -> "$HITOMI_BASE/galleries/$remoteId.html"
     SiteId.NovelCrow -> "$NOVELCROW_BASE/${remoteId.trimStart('/')}/"
+    SiteId.AllPornComic -> {
+        val path = remoteId.trimStart('/')
+        val full = if (path.contains('/')) path else "porncomic/$path"
+        "$ALLPORNCOMIC_BASE/$full/"
+    }
     SiteId.MangaDex -> "$MANGADEX_SITE/chapter/$remoteId"
 }
 
@@ -189,6 +199,7 @@ internal fun refererForImage(url: String): String? = when (siteFromHost(hostOf(u
     }
     SiteId.Hitomi -> "$HITOMI_BASE/"
     SiteId.NovelCrow -> "$NOVELCROW_BASE/"
+    SiteId.AllPornComic -> "$ALLPORNCOMIC_BASE/"
     SiteId.MangaDex -> "$MANGADEX_SITE/"
     null -> null
 }
@@ -218,9 +229,13 @@ internal fun pageListUrl(site: SiteId, remoteId: String, originalUrl: String): S
         ehentaiGalleryUrl(remoteId, origin)
     }
     SiteId.Hitomi -> "$HITOMI_LTN/galleries/$remoteId.js"
-    SiteId.NovelCrow -> {
-        val path = originalUrl.trim().substringBefore('?').trimEnd('/')
-        if (path.isNotEmpty()) "$path/" else "$NOVELCROW_BASE/${remoteId.trimStart('/')}/"
+    SiteId.NovelCrow, SiteId.AllPornComic -> {
+        val path = originalUrl.trim().substringBefore('?').substringBefore('#').trimEnd('/')
+        when {
+            path.startsWith("http") -> "$path/"
+            site == SiteId.AllPornComic -> canonicalUrl(SiteId.AllPornComic, remoteId)
+            else -> "$NOVELCROW_BASE/${remoteId.trimStart('/')}/"
+        }
     }
     SiteId.MangaDex -> "$MANGADEX_API/at-home/server/$remoteId"
 }
@@ -234,6 +249,7 @@ internal fun siteReferer(site: SiteId): String = when (site) {
     SiteId.EHentai -> "$EHENTAI_BASE/"
     SiteId.Hitomi -> "$HITOMI_BASE/"
     SiteId.NovelCrow -> "$NOVELCROW_BASE/"
+    SiteId.AllPornComic -> "$ALLPORNCOMIC_BASE/"
     SiteId.MangaDex -> "$MANGADEX_SITE/"
 }
 

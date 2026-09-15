@@ -155,6 +155,8 @@ class R2Merge(
     private val treeCache = ListingCache(8)
     private val coverCache = ConcurrentHashMap<String, String>()
     private val titleCache = ConcurrentHashMap<String, String>()
+    private val seriesChapterCache = ConcurrentHashMap<String, List<ParsedChapter>>()
+    private val remoteMetaCache = ConcurrentHashMap<String, SeriesMetadata>()
 
     private fun invalidateCaches() {
         seriesCache = null
@@ -163,6 +165,8 @@ class R2Merge(
         treeCache.clear()
         coverCache.clear()
         titleCache.clear()
+        seriesChapterCache.clear()
+        remoteMetaCache.clear()
         archives.clear()
     }
 
@@ -286,7 +290,7 @@ class R2Merge(
         val config = requireConfig()
         val prefix = seriesPrefix(config, manga.url)
         val listing = shallowListing(config, prefix)
-        val metadata = readMetadata(config, listing)
+        val metadata = resolvedMetadata(config, prefix, listing)
         SManga.create().apply {
             url = manga.url
             title = metadata?.title?.trim()?.takeIf { it.isNotEmpty() } ?: prefix.fileName()
@@ -298,6 +302,8 @@ class R2Merge(
             thumbnail_url = runCatching { coverUrl(config, prefix, listing, metadata) }.getOrNull()
             update_strategy = UpdateStrategy.ALWAYS_UPDATE
             initialized = true
+        }.also { details ->
+            details.title.trim().takeIf { it.isNotEmpty() }?.let { titleCache[prefix] = it }
         }
     }
 
@@ -314,6 +320,29 @@ class R2Merge(
             }
         }
         return null
+    }
+
+    private fun resolvedMetadata(
+        config: R2Config,
+        seriesPrefix: String,
+        listing: S3Listing,
+    ): SeriesMetadata? {
+        val local = readMetadata(config, listing)
+        val seriesUrl = firstRemoteSeriesUrl(jsonListedChapters(config, listing, seriesPrefix).chapters)
+            ?: return local
+        val remote = remoteMetaCache.getOrPut(normalizeSeriesCacheKey(seriesUrl)) {
+            runCatching { fetchRemoteSeriesMetadata(seriesUrl) }.getOrNull() ?: SeriesMetadata()
+        }.takeIf { it.title != null || it.cover != null || it.author != null || it.description != null }
+        return when {
+            local != null -> local.overlay(remote)
+            else -> remote
+        }
+    }
+
+    private fun fetchRemoteSeriesMetadata(url: String): SeriesMetadata? = when {
+        isMadaraSeriesUrl(url) -> fetchMadaraSeriesMetadata(client, headers, url)
+        isMangaDexSeriesUrl(url) -> fetchMangaDexMetadata(client, headers, url, json)
+        else -> null
     }
 
     private fun fetchText(config: R2Config, obj: S3Object): String? {
@@ -428,15 +457,20 @@ class R2Merge(
         return JsonChapterListing(overlay = overlay, chapters = chapters)
     }
 
-    private fun expandRemoteSeries(chapters: List<ParsedChapter>): List<ParsedChapter> = chapters.flatMap { chapter ->
-        val expanded = when {
-            isNovelCrowSeriesUrl(chapter.url) -> fetchNovelCrowChapters(client, headers, chapter.url)
-            isMangaDexSeriesUrl(chapter.url) -> fetchMangaDexChapters(client, headers, chapter.url, json)
-            else -> listOf(chapter)
+    private fun composeJsonChapters(listed: JsonChapterListing): Pair<List<ParsedChapter>, List<ParsedChapter>> = concatenateSources(listed.chapters, ::fetchSeriesChapters)
+
+    private fun fetchSeriesChapters(url: String): List<ParsedChapter> {
+        val key = normalizeSeriesCacheKey(url)
+        return seriesChapterCache.getOrPut(key) {
+            when {
+                isMadaraSeriesUrl(url) -> fetchMadaraChapters(client, headers, url)
+                isMangaDexSeriesUrl(url) -> fetchMangaDexChapters(client, headers, url, json)
+                else -> emptyList()
+            }
         }
-        val range = chapter.pageRange ?: return@flatMap expanded
-        expanded.map { it.copy(pageRange = it.pageRange ?: range) }
     }
+
+    private fun normalizeSeriesCacheKey(url: String): String = url.trim().substringBefore('#').substringBefore('?').trimEnd('/') + "/"
 
     private fun chaptersJsonCoverPage(
         config: R2Config,
@@ -444,7 +478,7 @@ class R2Merge(
         listing: S3Listing,
         ref: CoverPageRef,
     ): String? {
-        val chapters = expandRemoteSeries(jsonListedChapters(config, listing, seriesPrefix).chapters)
+        val chapters = composeJsonChapters(jsonListedChapters(config, listing, seriesPrefix)).first
         val chapter = findChapterByName(chapters, ref.chapter) { it.title } ?: return null
         val pages = pagesForCover(chapter.readerUrl())
         val imageUrl = pickCoverPage(pages, ref.page, preserveOrder = true) { it.imageUrl.orEmpty() }
@@ -544,11 +578,12 @@ class R2Merge(
         }
 
         val listed = jsonListedChapters(config, tree, prefix)
-        val extras = expandRemoteSeries(listed.chapters)
+        val (composed, leftover) = composeJsonChapters(listed)
+        val extras = composed + leftover
         val merged = if (listed.overlay) {
             mergeChapterLists(chapters, extras)
         } else {
-            (chapters + extras).distinctBy { it.readerUrl() }
+            (chapters + composed).distinctBy { it.readerUrl() }
         }
 
         if (merged.isEmpty()) {
@@ -601,12 +636,19 @@ class R2Merge(
             throw Exception("Static page chapters must be opened through fetchPageList")
         }
         val site = identifySite(url)
-        if (site == SiteId.MangaDex && isMangaDexSeriesUrl(url)) {
-            throw Exception("MangaDex title URLs expand when you refresh the chapter list.")
+        if (isRemoteSeriesUrl(url)) {
+            throw Exception("Series URLs expand when you refresh the chapter list.")
         }
         val remoteId = extractRemoteId(site, url)
         val target = pageListUrl(site, remoteId, url)
-        val builder = headers.newBuilder().set("Referer", siteReferer(site))
+        val builder = headers.newBuilder().set(
+            "Referer",
+            if (site == SiteId.NovelCrow || site == SiteId.AllPornComic) {
+                "${madaraOrigin(url)}/"
+            } else {
+                siteReferer(site)
+            },
+        )
         if (site == SiteId.Hitomi) builder.set("Origin", HITOMI_BASE)
         if (site == SiteId.MangaDex) {
             builder.set("User-Agent", MANGADEX_USER_AGENT).set("Accept", "application/json")
@@ -637,7 +679,8 @@ class R2Merge(
             host.contains("panda.chaika.moe") || host.contains("chaika.moe") -> parseChaikaPages(body)
             isEHentaiHost(host) -> parseEhentaiPages(body, requestUrl)
             host.contains(HITOMI_CDN) || host.contains("hitomi.la") -> parseHitomiPages(body)
-            host.contains("novelcrow.com") -> parseMadaraPages(body, requestUrl)
+            host.contains("novelcrow.com") || host.contains("allporncomic") ->
+                parseMadaraPages(body, requestUrl)
             host.contains("api.mangadex.org") -> parseMangaDexAtHome(body, json, requestUrl)
             else -> throw Exception("Don't know how to parse pages from $host")
         }
@@ -705,6 +748,8 @@ class R2Merge(
                 builder.set("Referer", page.url)
             page.url.contains("novelcrow.com") || url.contains("novelcrow.com") ->
                 builder.set("Referer", "$NOVELCROW_BASE/")
+            page.url.contains("allporncomic") || url.contains("allporncomic") ->
+                builder.set("Referer", "${madaraOrigin(page.url.ifBlank { url })}/")
             else -> refererForImage(url)?.let { builder.set("Referer", it) }
         }
         return GET(url, builder.build())

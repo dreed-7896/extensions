@@ -4,7 +4,7 @@ Mihon / TachiManga / Tachiyomi extension. Reads a Cloudflare R2 bucket.
 
 Package: `eu.kanade.tachiyomi.extension.all.r2merge` (in-place update of R2 Merge — credentials persist).
 
-Lib **1.4**, `1.4.11`. NSFW.
+Lib **1.4**, `1.4.12`. NSFW.
 
 ## Bucket layout
 
@@ -40,18 +40,23 @@ R2 Library on Suwatte is **2.0**. Update the list in-app after adding. Library b
   "cover": "Chapter 1_1",
   "chaptersOverlay": true,
   "chapters": [
-    { "title": "Chapter 4", "number": 4, "url": "https://nhentai.net/g/289857/", "pageRange": "3-50" },
-    { "title": "Chapter 6", "number": 6, "url": "https://hitomi.la/galleries/123456.html", "pageRange": "50" },
-    { "title": "Chapter 7", "number": 7, "url": "https://hentairead.com/hentai/example/" }
+    { "url": "https://hentairead.com/hentai/example/", "title": "Prologue" },
+    {
+      "url": "https://novelcrow.com/comic/slug/",
+      "chapterRange": "2-",
+      "titles": { "2": "Start here", "5": "Climax" }
+    },
+    { "url": "https://allporncomic.com/porncomic/slug/", "chapterRange": "1-10" },
+    { "title": "Chapter 4", "number": 4, "url": "https://nhentai.net/g/289857/", "pageRange": "3-50" }
   ]
 }
 ```
 
-Bucket zip/folder chapters are picked up automatically. With `"chaptersOverlay": true`, a JSON chapter whose `number` matches an existing folder/cbz **replaces** it (swap chapter 4); new numbers **append** (6, 7 after 5). Omit the flag to keep the old append-only merge. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
+Bucket zip/folder chapters are picked up automatically. JSON `chapters[]` are **sources in order**: a gallery URL is one chapter; a NovelCrow / AllPornComic / MangaDex series URL expands to **every** chapter on that title (optional `chapterRange`, blank = all, including chapters that show up later). Display numbers are then 1, 2, 3… so two sources that both have a “chapter 1” both appear. `"titles"` on a series row renames by **that site’s chapter numbers**. With `"chaptersOverlay": true`, the composed list replaces matching folder/cbz numbers. Omit the flag to keep JSON chapters in addition to folders. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
 
-Gallery hosts: nhentai, HentaiRead, HentaiNexus, Hentai2Read, PandaChaika, E-Hentai / ExHentai, Hitomi, NovelCrow, MangaDex. A NovelCrow `https://novelcrow.com/comic/slug/` or MangaDex `https://mangadex.org/title/{uuid}/…` series URL in `chapters[]` expands to every chapter on that title (NovelCrow may need a one-time Cloudflare solve; MangaDex prefers English when the same number exists in multiple languages), then numbered overlay entries still replace/append.
+Gallery hosts: nhentai, HentaiRead, HentaiNexus, Hentai2Read, PandaChaika, E-Hentai / ExHentai, Hitomi, NovelCrow, AllPornComic, MangaDex. Series URLs: `https://novelcrow.com/comic/slug/`, `https://allporncomic.com/porncomic/slug/`, `https://mangadex.org/title/{uuid}/…` (MangaDex prefers English when the same number exists in multiple languages). Madara sites may need a one-time Cloudflare solve in WebView.
 
-`"pageRange"` crops the reader: `"50"` = first 50 pages, `"3-50"` = pages 3–50, `"3-"` = page 3 through the end. Overlay-only `{ "number": 4, "pageRange": "1-50" }` slices a folder/cbz already on that number.
+`"chapterRange"` filters a series (`"2-"` = from 2 through newest, `"2-10"` = those chapters, `"5"` = only 5). `"pageRange"` crops pages in the reader: `"50"` = first 50 pages, `"3-50"` = pages 3–50, `"3-"` = page 3 through the end. Overlay-only `{ "number": 4, "pageRange": "1-50" }` slices a folder/cbz already on that number. If `details.json` title/cover/author are blank, the first series URL’s title and cover are filled in (local fields still win).
 
 `details.json` `"cover"`: `https://…`, `"Chapter 1_1"` (chapter + 1-based page), `"chapter 4_24.png"`, or a relative image.
 
@@ -67,7 +72,9 @@ TachiManga wants **index.pb**:
 https://github.com/raahat-hossain/extensions/raw/cursor/r2-merge-extension-8f4a/repo/index.pb
 ```
 
-Sideload: [`repo/apk/tachiyomi-all.r2merge-v1.4.11.apk`](repo/apk/tachiyomi-all.r2merge-v1.4.11.apk)
+Sideload: [`repo/apk/tachiyomi-all.r2merge-v1.4.12.apk`](repo/apk/tachiyomi-all.r2merge-v1.4.12.apk)
+
+1.4.11 was signed with a throwaway debug cert, so TachiManga hides the update. Uninstall R2 Library, remove the repo, re-add `index.pb`, install **1.4.12**. Later updates keep this key.
 
 Settings: Account ID, Access Key, Secret, Bucket. Root Prefix empty if titles sit at bucket root. Optional public image URL (r2.dev / custom domain).
 

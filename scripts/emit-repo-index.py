@@ -19,7 +19,7 @@ ROOT = SCRIPTS.parent
 REPO = ROOT / "repo"
 PKG = "eu.kanade.tachiyomi.extension.all.r2merge"
 SOURCE_ID = 8210462026091001
-DEFAULT_SIGNING_KEY = "9e494f587f3a03395cb2267981aa90432584621e0e435a378816aed7500e3d75"
+DEFAULT_SIGNING_KEY = "3a6e16769f64921128875f1967c28905262477dd8201bdb11877ea8b6e8116de"
 RAW_BASE = (
     "https://raw.githubusercontent.com/raahat-hossain/extensions/"
     "cursor/r2-merge-extension-8f4a/repo"

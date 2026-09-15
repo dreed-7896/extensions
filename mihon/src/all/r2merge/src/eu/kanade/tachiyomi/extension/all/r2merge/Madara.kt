@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.extension.all.r2merge
 
+import eu.kanade.tachiyomi.extension.all.r2merge.meta.SeriesMetadata
 import eu.kanade.tachiyomi.extension.all.r2merge.util.chapterNumberOf
 import eu.kanade.tachiyomi.extension.all.r2merge.util.overlayChapterNumber
 import eu.kanade.tachiyomi.network.GET
@@ -13,22 +14,53 @@ import org.jsoup.Jsoup
 import java.io.IOException
 
 internal const val NOVELCROW_BASE = "https://novelcrow.com"
+internal const val ALLPORNCOMIC_BASE = "https://allporncomic.com"
 
-private val SERIES_PATH = Regex(
-    """^https?://(?:www\.)?novelcrow\.com/(comic|manga)/([^/?#]+)/?$""",
+private val MADARA_SERIES_PATH = Regex(
+    """^https?://(?:www\.)?(novelcrow\.com|allporncomic\.com|allporncomics\.com)/""" +
+        """(comic|manga|porncomic)/([^/?#]+)/?$""",
     RegexOption.IGNORE_CASE,
 )
 
-internal fun isNovelCrowSeriesUrl(url: String): Boolean = SERIES_PATH.containsMatchIn(url.trim())
+internal fun isMadaraSeriesUrl(url: String): Boolean {
+    val path = url.trim().substringBefore('?').substringBefore('#')
+    return MADARA_SERIES_PATH.containsMatchIn(path)
+}
 
-internal fun isRemoteSeriesUrl(url: String): Boolean = isNovelCrowSeriesUrl(url) || isMangaDexSeriesUrl(url)
+internal fun isNovelCrowSeriesUrl(url: String): Boolean = isMadaraSeriesUrl(url) && hostOf(url).contains("novelcrow")
 
-internal fun parseMadaraChapterList(html: String, baseUrl: String): List<ParsedChapter> {
+internal fun isRemoteSeriesUrl(url: String): Boolean = isMadaraSeriesUrl(url) || isMangaDexSeriesUrl(url)
+
+internal fun madaraOrigin(url: String): String {
+    val match = Regex("""^(https?://[^/?#]+)""", RegexOption.IGNORE_CASE).find(url.trim())
+    return match?.groupValues?.get(1)?.trimEnd('/') ?: NOVELCROW_BASE
+}
+
+internal fun madaraHostLabel(url: String): String {
+    val host = hostOf(url)
+    return when {
+        host.contains("allporncomic") -> "AllPornComic"
+        host.contains("novelcrow") -> "NovelCrow"
+        host.isNotBlank() -> host
+        else -> "Madara"
+    }
+}
+
+internal fun madaraRelativePath(url: String): String {
+    val path = url.trim()
+        .replace(Regex("""[?#].*$"""), "")
+        .trimEnd('/')
+        .replace(Regex("""^https?://[^/]+""", RegexOption.IGNORE_CASE), "")
+        .trim('/')
+    return path
+}
+
+internal fun parseMadaraChapterList(html: String, baseUrl: String, scanlator: String): List<ParsedChapter> {
     val document = Jsoup.parse(html, baseUrl)
     return document.select("li.wp-manga-chapter a, .wp-manga-chapter > a")
         .mapNotNull { link ->
             val href = link.absUrl("href").ifBlank { link.attr("href") }.trim()
-            if (href.isBlank() || isNovelCrowSeriesUrl(href)) return@mapNotNull null
+            if (href.isBlank() || isMadaraSeriesUrl(href)) return@mapNotNull null
             val title = link.ownText().ifBlank { link.text() }.trim()
             if (title.isBlank()) return@mapNotNull null
             val number = overlayChapterNumber(title)
@@ -39,8 +71,9 @@ internal fun parseMadaraChapterList(html: String, baseUrl: String): List<ParsedC
                 title = title,
                 number = number,
                 url = href.substringBefore('?').trimEnd('/') + "/",
-                scanlator = "NovelCrow",
+                scanlator = scanlator,
                 explicitNumber = number > 0f,
+                sourceNumber = number,
             )
         }
         .distinctBy { it.url }
@@ -70,23 +103,81 @@ internal fun parseMadaraPages(html: String, pageUrl: String): List<Page> {
         keep.containsMatchIn(url) || !skip.containsMatchIn(url)
     }.distinct()
     if (urls.isEmpty()) {
-        throw IOException("NovelCrow: no pages at $pageUrl")
+        throw IOException("${madaraHostLabel(pageUrl)}: no pages at $pageUrl")
     }
     return urls.mapIndexed { index, url -> Page(index, url = pageUrl, imageUrl = url) }
 }
 
-internal fun fetchNovelCrowChapters(
+internal fun parseMadaraSeriesMetadata(html: String, pageUrl: String): SeriesMetadata {
+    val document = Jsoup.parse(html, pageUrl)
+    val title = listOf(
+        "div.post-title h1",
+        ".post-title h1",
+        "h1.entry-title",
+        "h1",
+    ).firstNotNullOfOrNull { selector ->
+        document.selectFirst(selector)?.text()?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    val coverEl = document.selectFirst("div.summary_image img, .summary_image img, meta[property=og:image]")
+    val cover = when {
+        coverEl == null -> null
+        coverEl.tagName() == "meta" -> coverEl.attr("abs:content").ifBlank { coverEl.attr("content") }
+            .takeIf { it.startsWith("http") }
+        else -> madaraImageUrl(coverEl)
+    }
+    val author = document.select(".author-content a, .manga-authors a")
+        .eachText()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .joinToString()
+        .takeIf { it.isNotEmpty() }
+    val artist = document.select(".artist-content a")
+        .eachText()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .joinToString()
+        .takeIf { it.isNotEmpty() }
+    val description = document.selectFirst(
+        "div.description-summary .summary__content, .summary__content, div.summary__content",
+    )?.text()?.trim()?.takeIf { it.isNotEmpty() }
+    val genre = document.select(".genres-content a")
+        .eachText()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .joinToString(", ")
+        .takeIf { it.isNotEmpty() }
+    val statusRaw = document.select(".post-content_item").firstOrNull { item ->
+        item.selectFirst("h5, .summary-heading")?.text().orEmpty().contains("status", ignoreCase = true)
+    }?.selectFirst(".summary-content")?.text()
+        ?: document.selectFirst(".post-status .summary-content")?.text()
+    return SeriesMetadata(
+        title = title,
+        author = author,
+        artist = artist,
+        description = description,
+        genre = genre,
+        status = SeriesMetadata.statusOf(statusRaw),
+        cover = cover,
+    )
+}
+
+internal fun fetchMadaraChapters(
     client: OkHttpClient,
     headers: Headers,
     seriesUrl: String,
 ): List<ParsedChapter> {
+    val label = madaraHostLabel(seriesUrl)
+    val origin = madaraOrigin(seriesUrl)
     val series = seriesUrl.trim().substringBefore('#').substringBefore('?').trimEnd('/') + "/"
     val pageHeaders = headers.newBuilder()
-        .set("Referer", "$NOVELCROW_BASE/")
+        .set("Referer", "$origin/")
         .set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
         .build()
-    var html = fetchHttp(client, GET(series, pageHeaders))
-    var chapters = parseMadaraChapterList(html, series)
+    var html = fetchMadaraHttp(client, GET(series, pageHeaders), label)
+    var chapters = parseMadaraChapterList(html, series, label)
     if (chapters.isEmpty()) {
         val ajaxHeaders = pageHeaders.newBuilder()
             .set("X-Requested-With", "XMLHttpRequest")
@@ -95,16 +186,17 @@ internal fun fetchNovelCrowChapters(
         val ajaxUrls = listOf("${series}ajax/chapters/", "${series}ajax/chapters")
         for (ajaxUrl in ajaxUrls) {
             html = runCatching {
-                fetchHttp(
+                fetchMadaraHttp(
                     client,
                     Request.Builder()
                         .url(ajaxUrl)
                         .headers(ajaxHeaders)
                         .post(ByteArray(0).toRequestBody(null))
                         .build(),
+                    label,
                 )
             }.getOrNull() ?: continue
-            chapters = parseMadaraChapterList(html, series)
+            chapters = parseMadaraChapterList(html, series, label)
             if (chapters.isNotEmpty()) break
         }
     }
@@ -122,10 +214,10 @@ internal fun fetchNovelCrowChapters(
                 .add("action", "manga_get_chapters")
                 .add("manga", postId)
                 .build()
-            html = fetchHttp(
+            html = fetchMadaraHttp(
                 client,
                 Request.Builder()
-                    .url("$NOVELCROW_BASE/wp-admin/admin-ajax.php")
+                    .url("$origin/wp-admin/admin-ajax.php")
                     .headers(
                         pageHeaders.newBuilder()
                             .set("X-Requested-With", "XMLHttpRequest")
@@ -134,17 +226,39 @@ internal fun fetchNovelCrowChapters(
                     )
                     .post(form)
                     .build(),
+                label,
             )
-            chapters = parseMadaraChapterList(html, series)
+            chapters = parseMadaraChapterList(html, series, label)
         }
     }
     if (chapters.isEmpty()) {
         throw IOException(
-            "No NovelCrow chapters at $series — open a NovelCrow page to pass Cloudflare, then refresh.",
+            "No $label chapters at $series — open a $label page to pass Cloudflare, then refresh.",
         )
     }
     return chapters.sortedWith(compareBy { it.number })
 }
+
+internal fun fetchMadaraSeriesMetadata(
+    client: OkHttpClient,
+    headers: Headers,
+    seriesUrl: String,
+): SeriesMetadata {
+    val origin = madaraOrigin(seriesUrl)
+    val series = seriesUrl.trim().substringBefore('#').substringBefore('?').trimEnd('/') + "/"
+    val pageHeaders = headers.newBuilder()
+        .set("Referer", "$origin/")
+        .set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+        .build()
+    val html = fetchMadaraHttp(client, GET(series, pageHeaders), madaraHostLabel(seriesUrl))
+    return parseMadaraSeriesMetadata(html, series)
+}
+
+internal fun fetchNovelCrowChapters(
+    client: OkHttpClient,
+    headers: Headers,
+    seriesUrl: String,
+): List<ParsedChapter> = fetchMadaraChapters(client, headers, seriesUrl)
 
 private fun madaraImageUrl(element: org.jsoup.nodes.Element): String? {
     val url = listOf("data-src", "data-lazy-src", "data-cfsrc", "src")
@@ -156,7 +270,7 @@ private fun madaraImageUrl(element: org.jsoup.nodes.Element): String? {
     return url
 }
 
-private fun fetchHttp(client: OkHttpClient, request: Request): String {
+private fun fetchMadaraHttp(client: OkHttpClient, request: Request, label: String): String {
     val response = client.newCall(request).execute()
     val body = response.use { it.body.string() }
     if (!response.isSuccessful) {
@@ -166,7 +280,7 @@ private fun fetchHttp(client: OkHttpClient, request: Request): String {
         (body.contains("cf-", ignoreCase = true) || body.contains("challenge-platform"))
     ) {
         throw IOException(
-            "Cloudflare blocked NovelCrow. Open any NovelCrow chapter, solve it, then refresh.",
+            "Cloudflare blocked $label. Open any $label page, solve it, then refresh.",
         )
     }
     return body
