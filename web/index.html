@@ -301,27 +301,14 @@
 
   <section>
     <h2>Chapters</h2>
-    <div class="row">
-      <div>
-        <label for="existingCount">Already in R2</label>
-        <input id="existingCount" type="number" min="0" step="1" value="0" />
-      </div>
-      <div>
-        <label>&nbsp;</label>
-        <label class="check-row" style="margin-top:0">
-          <input id="overlay" type="checkbox" checked />
-          <span>Overlay onto R2 folders</span>
-        </label>
-      </div>
-    </div>
-    <p class="hint">Sources are listed in order — whichever host you add first shows first. A gallery URL is one chapter. A NovelCrow / AllPornComic / MangaDex <em>series</em> URL expands to <strong>every</strong> chapter on that title. Blank <code>Ch.</code> range = all chapters, including ones that appear later. Overlay maps that composed list onto folder/cbz numbers 1, 2, 3…</p>
-    <p class="hint"><code>Ch.</code> (series only): <code>2-</code> = from 2 through newest, <code>2-10</code> = those chapters, <code>5</code> = only 5. Name fields use that source’s chapter numbers. <code>Pages</code> still crops images: <code>50</code> / <code>3-50</code> / <code>3-</code>.</p>
+    <p class="hint">Sources in list order. A gallery URL is one chapter. A NovelCrow / AllPornComic / MangaDex series URL expands to <strong>every</strong> chapter on that title. Blank <code>Ch.</code> = all, including chapters that show up later. Replacing <code>details.json</code> in the bucket is the whole update.</p>
+    <p class="hint"><code>Ch.</code> (series only): <code>2-</code> = from 2 through newest, <code>2-10</code> = those chapters, <code>5</code> = only 5. Name fields use that source’s chapter numbers. <code>Pages</code> crops images: <code>50</code> / <code>3-50</code> / <code>3-</code>.</p>
     <div id="chapters"></div>
     <div class="add-row">
       <button class="add" type="button" id="addBtn">+ Chapter</button>
       <button class="ghost" type="button" id="pasteBtn">Paste links</button>
     </div>
-    <p class="hint">Row order is the chapter order. Names on a series are optional. Number + pages with no URL still slices a folder/cbz already on that number.</p>
+    <p class="hint">Row order is the chapter order. Names on a series are optional.</p>
   </section>
 
   <section>
@@ -528,25 +515,12 @@
       cover: $("cover"),
     };
 
-    const existingCountEl = $("existingCount");
-    const overlayEl = $("overlay");
-
     const asNumber = (value) => {
       const n = Number(value);
       return Number.isFinite(n) && n > 0 ? n : 0;
     };
 
-    const existingCount = () => asNumber(existingCountEl.value);
-
     const chapterNumber = (ch) => asNumber(ch?.number);
-
-    const maxChapterNumber = () => Math.max(
-      existingCount(),
-      0,
-      ...chapters.map((ch) => chapterNumber(ch)),
-    );
-
-    const nextNumber = () => maxChapterNumber() + 1;
 
     const emptyChapter = (partial = {}) => ({
       url: partial.url || "",
@@ -558,14 +532,7 @@
       titlesSpec: partial.titlesSpec || "",
     });
 
-    const withNumber = (ch) => emptyChapter({
-      ...ch,
-      number: asNumber(ch.number) || nextNumber(),
-    });
-
     let chapters = [emptyChapter()];
-
-    const defaultTitle = (ch, i) => `Chapter ${chapterNumber(ch) || i + 1}`;
 
     const applyPasteToChapter = (idx, text) => {
       const items = extractChapterPastes(text);
@@ -617,7 +584,6 @@
       genre: fields.genre.value.split(",").map((s) => s.trim()).filter(Boolean),
       status: fields.status.value,
       cover: fields.cover.value.trim(),
-      overlay: overlayEl.checked,
       chapters: chapters.map((ch, i) => {
         const url = ch.url.trim();
         const title = ch.title.trim();
@@ -655,16 +621,11 @@
       if (data.genre.length) details.genre = data.genre;
       if (data.status && data.status !== "unknown") details.status = data.status;
       if (data.cover) details.cover = data.cover;
-      if (data.overlay) details.chaptersOverlay = true;
       if (!split) details.chapters = data.chapters;
       return details;
     };
 
-    const buildChaptersFile = () => {
-      const file = { chapters: readForm().chapters };
-      if (overlayEl.checked) file.overlay = true;
-      return file;
-    };
+    const buildChaptersFile = () => ({ chapters: readForm().chapters });
 
     const jsonText = (obj) => `${JSON.stringify(obj, null, 2)}\n`;
 
@@ -684,19 +645,19 @@
     const renderChapters = () => {
       $("chapters").innerHTML = chapters.map((ch, i) => {
         const series = isSeriesUrl(ch.url);
-        const overlayOnly = !String(ch.url || "").trim();
+        const noUrl = !String(ch.url || "").trim();
         return `
         <div class="chapter" data-i="${i}">
           <div class="chapter-head">
             <span class="idx">${i + 1}</span>
-            ${overlayOnly ? `<input class="ch-num" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" value="${chapterNumber(ch) || ""}" />` : ""}
+            ${noUrl ? `<input class="ch-num" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" value="${chapterNumber(ch) || ""}" />` : ""}
             <input class="grow ch-url" data-i="${i}" placeholder="https://…  or  Chapter 001.cbz" value="${escapeAttr(ch.url)}" />
             <button class="icon-btn" type="button" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
             <button class="icon-btn" type="button" data-down="${i}" ${i === chapters.length - 1 ? "disabled" : ""}>↓</button>
             <button class="icon-btn danger" type="button" data-del="${i}">✕</button>
           </div>
           <div class="chapter-meta">
-            ${series ? "" : `<input class="ch-title" data-i="${i}" placeholder="${overlayOnly ? "Rename / optional name" : "Optional chapter name"}" value="${escapeAttr(ch.title)}" />`}
+            ${series ? "" : `<input class="ch-title" data-i="${i}" placeholder="Optional chapter name" value="${escapeAttr(ch.title)}" />`}
             ${series ? `<input class="ch-range" data-i="${i}" placeholder="all" value="${escapeAttr(ch.chapterRange)}" title="Chapter range: blank = all, 2- = from 2, 2-10 = those chapters" />` : ""}
             <input class="ch-pages" data-i="${i}" placeholder="3-50" value="${escapeAttr(ch.pageRange)}" title="Pages: 50 = first 50, 3-50 = those pages" />
           </div>
@@ -727,8 +688,6 @@
     const saveLocal = () => {
       localStorage.setItem(STORAGE, JSON.stringify({
         ...Object.fromEntries(Object.entries(fields).map(([k, el]) => [k, el.value])),
-        existingCount: existingCountEl.value,
-        overlay: overlayEl.checked,
         chapters,
       }));
     };
@@ -740,8 +699,6 @@
         Object.entries(fields).forEach(([k, el]) => {
           if (raw[k] != null) el.value = raw[k];
         });
-        if (raw.existingCount != null) existingCountEl.value = raw.existingCount;
-        if (typeof raw.overlay === "boolean") overlayEl.checked = raw.overlay;
         if (Array.isArray(raw.chapters) && raw.chapters.length) {
           chapters = raw.chapters.map((ch) => emptyChapter(ch));
         }
@@ -832,8 +789,6 @@
       if (g) fields.genre.value = g;
       if (obj.status) fields.status.value = String(obj.status).toLowerCase();
       if (obj.cover) fields.cover.value = obj.cover;
-      if (obj.chaptersOverlay === true || obj.overlay === true) overlayEl.checked = true;
-      if (obj.chaptersOverlay === false || obj.overlay === false) overlayEl.checked = false;
       const list = Array.isArray(obj) ? obj : (obj.chapters || obj.chapter_list);
       if (!Array.isArray(list) || !list.length) return;
       const occupied = chapters.some((ch) => ch.url.trim() || ch.title.trim() || String(ch.pageRange || "").trim() || String(ch.chapterRange || "").trim());
@@ -902,7 +857,7 @@
       const down = e.target.dataset.down;
       if (del != null) {
         if (chapters.length === 1) {
-          chapters = [emptyChapter({ number: existingCount() + 1 })];
+          chapters = [emptyChapter()];
         } else {
           chapters.splice(Number(del), 1);
         }
@@ -923,11 +878,6 @@
     Object.values(fields).forEach((el) => {
       el.addEventListener("input", () => { updatePreview(); saveLocal(); });
     });
-    existingCountEl.addEventListener("input", () => {
-      updatePreview();
-      saveLocal();
-    });
-    overlayEl.addEventListener("change", () => { updatePreview(); saveLocal(); });
 
     $("addBtn").addEventListener("click", () => {
       chapters.push(emptyChapter());
@@ -950,7 +900,7 @@
 
     $("coverFromFirst").addEventListener("click", () => {
       const data = readForm();
-      const name = data.chapters[0]?.title || defaultTitle(chapters[0], 0);
+      const name = data.chapters[0]?.title || "Chapter 1";
       fields.cover.value = `${name}_1`;
       updatePreview();
       saveLocal();
@@ -1004,9 +954,7 @@
 
     $("clearBtn").addEventListener("click", () => {
       Object.values(fields).forEach((el) => { el.value = el.tagName === "SELECT" ? "ongoing" : ""; });
-      existingCountEl.value = "0";
-      overlayEl.checked = true;
-      chapters = [{ url: "", title: "", number: 0, pageRange: "", chapterRange: "", titles: {}, titlesSpec: "" }];
+      chapters = [emptyChapter()];
       localStorage.removeItem(STORAGE);
       renderChapters();
     });

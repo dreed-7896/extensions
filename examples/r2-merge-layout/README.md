@@ -15,19 +15,17 @@ Manga/                          # folder name = content id
 
 ## chapters.json
 
-Array, or `{ "chapters": [ ... ] }`. Can also live inside `details.json` as `"chapters": [ ... ]` (preferred — one file). Merged with zip/folder chapters already in the series.
+Array, or `{ "chapters": [ ... ] }`. Can also live inside `details.json` as `"chapters": [ ... ]` (preferred — one file). Replacing that file is the update. Folder/cbz chapters in the same prefix still show alongside JSON if you leave them there.
 
-Set `"chaptersOverlay": true` on `details.json` (or `"overlay": true` on `chapters.json`) to **replace R2 folder/cbz chapters by composed order** instead of always appending:
+JSON `chapters[]` are sources **in list order**. Any host can be first.
 
-- JSON `chapters[]` are sources **in list order**. Any host can be first.
 - A gallery URL is one chapter. A NovelCrow / AllPornComic / MangaDex series URL expands to every chapter on that title.
 - Blank `chapterRange` = all chapters, including ones that appear later (`"2-"` = from 2 through newest).
 - `"titles"` on a series row renames by **that source’s chapter numbers** (`"2"`, `"5"`, …).
-- After expansion, display numbers are 1, 2, 3… Overlay then maps that list onto folder/cbz numbers.
+- After expansion, display numbers are 1, 2, 3…
 
 ```json
 {
-  "chaptersOverlay": true,
   "chapters": [
     { "url": "https://hentairead.com/hentai/example/", "title": "Prologue" },
     {
@@ -38,18 +36,6 @@ Set `"chaptersOverlay": true` on `details.json` (or `"overlay": true` on `chapte
     {
       "url": "https://allporncomic.com/porncomic/slug/"
     }
-  ]
-}
-```
-
-Gallery-only rows still concatenate in list order (JSON `number` is ignored on URL rows). To crop a folder/cbz already numbered 4, use a no-URL overlay:
-
-```json
-{
-  "chaptersOverlay": true,
-  "chapters": [
-    { "number": 4, "pageRange": "3-50" },
-    { "url": "https://hitomi.la/galleries/123456.html" }
   ]
 }
 ```
@@ -82,12 +68,11 @@ Gallery-only rows still concatenate in list order (JSON `number` is ignored on U
 | `url` / `href` / `link` / `archive` / `file` | Gallery page, remote `.cbz`/`.zip`, or a path relative to the series folder |
 | `source` / `site` / `host` | Optional: `nhentai`, `hentairead`, `hentainexus`, `hentai2read`, `pandachaika`, `ehentai`, `hitomi`, `novelcrow`, `allporncomic`, `mangadex` (aliases: `nh`, `hr`, `hn`, `h2r`, `chaika`, `eh`, `exhentai`, `nc`, `apc`, `md`). `zip`/`cbz` forces archive handling |
 | `id` | Gallery/slug id if you skip the URL (`id` + `source`) |
-| `title` / `number` / `date` / `scanlator` | Optional display fields. Series rows ignore `title`/`number` (use `titles` / `chapterRange`). After compose, overlay uses sequential 1..N |
+| `title` / `number` / `date` / `scanlator` | Optional display fields. Series rows ignore `title`/`number` (use `titles` / `chapterRange`) |
 | `chapterRange` | Series only. Blank = all (including new chapters later). `"2-"` = from 2 through newest, `"2-10"` = those chapters, `"5"` = only 5. On a series row, `range` is treated as `chapterRange` |
 | `titles` | Series only. Map of **source** chapter number → name, e.g. `{ "2": "Start here" }` |
-| `chaptersOverlay` / `overlay` | On the file root (not per chapter). `true` = replace matching R2 folder/cbz numbers with the composed JSON list |
 | `pages` | Raw image URLs — skips site/archive parsing |
-| `pageRange` | Crop the reader. `"50"` = first 50, `"3-50"` = pages 3–50, `"3-"` = 3 through the end. Also `pageStart`/`pageEnd`. Overlay `{ "number": 4, "pageRange": "1-50" }` slices a folder/cbz already numbered 4 |
+| `pageRange` | Crop the reader. `"50"` = first 50, `"3-50"` = pages 3–50, `"3-"` = 3 through the end. Also `pageStart`/`pageEnd` |
 
 ### Gallery hosts
 

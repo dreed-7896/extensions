@@ -38,7 +38,6 @@ R2 Library on Suwatte is **2.0**. Update the list in-app after adding. Library b
   "author": "Hyji",
   "status": "completed",
   "cover": "Chapter 1_1",
-  "chaptersOverlay": true,
   "chapters": [
     { "url": "https://hentairead.com/hentai/example/", "title": "Prologue" },
     {
@@ -52,11 +51,11 @@ R2 Library on Suwatte is **2.0**. Update the list in-app after adding. Library b
 }
 ```
 
-Bucket zip/folder chapters are picked up automatically. JSON `chapters[]` are **sources in order**: a gallery URL is one chapter; a NovelCrow / AllPornComic / MangaDex series URL expands to **every** chapter on that title (optional `chapterRange`, blank = all, including chapters that show up later). Display numbers are then 1, 2, 3… so two sources that both have a “chapter 1” both appear. `"titles"` on a series row renames by **that site’s chapter numbers**. With `"chaptersOverlay": true`, the composed list replaces matching folder/cbz numbers. Omit the flag to keep JSON chapters in addition to folders. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
+Bucket zip/folder chapters are picked up automatically and listed **with** JSON chapters. JSON `chapters[]` are **sources in order**: a gallery URL is one chapter; a NovelCrow / AllPornComic / MangaDex series URL expands to **every** chapter on that title (optional `chapterRange`, blank = all, including chapters that show up later). Display numbers are then 1, 2, 3… so two sources that both have a “chapter 1” both appear. `"titles"` on a series row renames by **that site’s chapter numbers**. Replace `details.json` in the bucket to update the list. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
 
 Gallery hosts: nhentai, HentaiRead, HentaiNexus, Hentai2Read, PandaChaika, E-Hentai / ExHentai, Hitomi, NovelCrow, AllPornComic, MangaDex. Series URLs: `https://novelcrow.com/comic/slug/`, `https://allporncomic.com/porncomic/slug/`, `https://mangadex.org/title/{uuid}/…` (MangaDex prefers English when the same number exists in multiple languages). Madara sites may need a one-time Cloudflare solve in WebView.
 
-`"chapterRange"` filters a series (`"2-"` = from 2 through newest, `"2-10"` = those chapters, `"5"` = only 5). `"pageRange"` crops pages in the reader: `"50"` = first 50 pages, `"3-50"` = pages 3–50, `"3-"` = page 3 through the end. Overlay-only `{ "number": 4, "pageRange": "1-50" }` slices a folder/cbz already on that number. If `details.json` title/cover/author are blank, the first series URL’s title and cover are filled in (local fields still win).
+`"chapterRange"` filters a series (`"2-"` = from 2 through newest, `"2-10"` = those chapters, `"5"` = only 5). `"pageRange"` crops pages in the reader: `"50"` = first 50 pages, `"3-50"` = pages 3–50, `"3-"` = page 3 through the end. If `details.json` title/cover/author are blank, the first series URL’s title and cover are filled in (local fields still win).
 
 `details.json` `"cover"`: `https://…`, `"Chapter 1_1"` (chapter + 1-based page), `"chapter 4_24.png"`, or a relative image.
 
