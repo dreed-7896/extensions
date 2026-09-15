@@ -594,9 +594,17 @@
       const fromSlots = normalizeTitles(ch.titles);
       const fromSpec = parseTitlesSpec(ch.titlesSpec);
       const merged = { ...fromSpec, ...fromSlots };
+      const range = parseChapterRange(ch.chapterRange);
       const out = {};
       Object.keys(merged).sort((a, b) => Number(a) - Number(b)).forEach((key) => {
-        if (String(merged[key] || "").trim()) out[key] = String(merged[key]).trim();
+        const label = String(merged[key] || "").trim();
+        if (!label) return;
+        const n = Number(key);
+        if (range) {
+          if (!Number.isFinite(n) || n + 1e-9 < range.start) return;
+          if (range.end != null && n - 1e-9 > range.end) return;
+        }
+        out[key] = label;
       });
       return out;
     };
