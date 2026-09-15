@@ -455,8 +455,7 @@ class R2Merge(
     }
 
     /** Expand each source in list order, then concatenate. */
-    private fun composeJsonChapters(listed: JsonChapterListing): List<ParsedChapter> =
-        concatenateSources(listed.chapters, ::fetchSeriesChapters).first
+    private fun composeJsonChapters(listed: JsonChapterListing): List<ParsedChapter> = concatenateSources(listed.chapters, ::fetchSeriesChapters).first
 
     private fun fetchSeriesChapters(url: String): List<ParsedChapter> {
         val key = normalizeSeriesCacheKey(url)
