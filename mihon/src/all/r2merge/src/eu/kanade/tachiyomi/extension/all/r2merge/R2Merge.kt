@@ -155,6 +155,7 @@ class R2Merge(
     private val treeCache = ListingCache(8)
     private val coverCache = ConcurrentHashMap<String, String>()
     private val titleCache = ConcurrentHashMap<String, String>()
+    private val mangaWebViewCache = ConcurrentHashMap<String, String>()
     private val seriesChapterCache = ConcurrentHashMap<String, List<ParsedChapter>>()
     private val remoteMetaCache = ConcurrentHashMap<String, SeriesMetadata>()
 
@@ -165,6 +166,7 @@ class R2Merge(
         treeCache.clear()
         coverCache.clear()
         titleCache.clear()
+        mangaWebViewCache.clear()
         seriesChapterCache.clear()
         remoteMetaCache.clear()
         archives.clear()
@@ -451,7 +453,11 @@ class R2Merge(
                 chapters += parseChaptersJson(body, json, seriesPrefix)
             }
         }
-        return JsonChapterListing(chapters = chapters)
+        return JsonChapterListing(chapters = chapters).also { listed ->
+            firstPublicMangaUrl(listed.chapters.map { it.url })?.let { url ->
+                mangaWebViewCache[seriesPrefix] = url
+            }
+        }
     }
 
     /** Expand each source in list order, then concatenate. */
@@ -1001,8 +1007,23 @@ class R2Merge(
     override fun mangaDetailsParse(response: Response) = throw UnsupportedOperationException()
     override fun chapterListRequest(manga: SManga) = throw UnsupportedOperationException()
     override fun chapterListParse(response: Response) = throw UnsupportedOperationException()
-    override fun getMangaUrl(manga: SManga): String = ""
-    override fun getChapterUrl(chapter: SChapter): String = ""
+    override fun getMangaUrl(manga: SManga): String = runCatching { mangaWebViewUrl(manga) }.getOrNull().orEmpty()
+
+    override fun getChapterUrl(chapter: SChapter): String =
+        publicChapterUrl(splitPageRange(chapter.url).first).orEmpty()
+
+    /**
+     * Series WebView: first JSON source's public page (HR gallery, HN `/view`,
+     * NovelCrow `/comic/slug/`). Folder-only series stay empty.
+     */
+    private fun mangaWebViewUrl(manga: SManga): String {
+        val config = config() ?: return ""
+        val prefix = seriesPrefix(config, manga.url)
+        mangaWebViewCache[prefix]?.let { return it }
+        val listing = shallowListing(config, prefix)
+        jsonListedChapters(config, listing, prefix)
+        return mangaWebViewCache[prefix].orEmpty()
+    }
 
     companion object {
         private const val PAGE_SIZE = 30

@@ -170,6 +170,53 @@ internal fun extractRemoteId(site: SiteId, url: String): String {
     }
 }
 
+/**
+ * Public page for WebView / share. Matches how the standalone extensions
+ * expose URLs: HR gallery (not `/english/p/1/`), HN `/view` vs `/read`,
+ * NovelCrow series vs chapter path. Never API/CDN endpoints.
+ */
+internal fun publicMangaUrl(url: String): String? = publicSiteUrl(url, chapter = false)
+
+internal fun publicChapterUrl(url: String): String? = publicSiteUrl(url, chapter = true)
+
+internal fun firstPublicMangaUrl(urls: List<String>): String? = urls.firstNotNullOfOrNull(::publicMangaUrl)
+
+private fun publicSiteUrl(url: String, chapter: Boolean): String? {
+    val trimmed = url.trim()
+    if (trimmed.isEmpty() || trimmed.startsWith("pages:", ignoreCase = true)) return null
+    if (!isAbsoluteHttpUrl(trimmed) || isRemoteArchiveUrl(trimmed)) return null
+    val site = tryIdentifySite(trimmed) ?: return trimmed.substringBefore('#').ifBlank { null }
+    val id = runCatching { extractRemoteId(site, trimmed) }.getOrNull()
+        ?: return trimmed.substringBefore('#').ifBlank { null }
+    return when (site) {
+        SiteId.HentaiRead -> canonicalUrl(SiteId.HentaiRead, id)
+        SiteId.HentaiNexus -> if (chapter) {
+            "https://hentainexus.com/read/$id"
+        } else {
+            "https://hentainexus.com/view/$id"
+        }
+        SiteId.Nhentai -> canonicalUrl(SiteId.Nhentai, id)
+        SiteId.Hitomi -> if (chapter && trimmed.contains("/reader/", ignoreCase = true)) {
+            "$HITOMI_BASE/reader/$id.html"
+        } else {
+            canonicalUrl(SiteId.Hitomi, id)
+        }
+        SiteId.PandaChaika -> canonicalUrl(SiteId.PandaChaika, id)
+        SiteId.Hentai2Read -> canonicalUrl(SiteId.Hentai2Read, id)
+        SiteId.EHentai -> {
+            val origin = if (hostOf(trimmed).contains("exhentai")) EXHENTAI_BASE else EHENTAI_BASE
+            ehentaiGalleryUrl(id, origin)
+        }
+        SiteId.NovelCrow, SiteId.AllPornComic ->
+            trimmed.substringBefore('?').substringBefore('#').trimEnd('/') + "/"
+        SiteId.MangaDex -> if (isMangaDexSeriesUrl(trimmed)) {
+            "$MANGADEX_SITE/title/$id"
+        } else {
+            "$MANGADEX_SITE/chapter/$id"
+        }
+    }
+}
+
 internal fun canonicalUrl(site: SiteId, remoteId: String): String = when (site) {
     SiteId.Nhentai -> "https://nhentai.net/g/$remoteId/"
     SiteId.HentaiRead -> "https://hentairead.com/hentai/$remoteId/"

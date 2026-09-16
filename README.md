@@ -4,7 +4,7 @@ Mihon / TachiManga / Tachiyomi extension. Reads a Cloudflare R2 bucket.
 
 Package: `eu.kanade.tachiyomi.extension.all.r2merge` (in-place update of R2 Merge — credentials persist).
 
-Lib **1.4**, `1.4.13`. NSFW.
+Lib **1.4**, `1.4.14`. NSFW.
 
 ## Bucket layout
 
@@ -53,7 +53,7 @@ R2 Library on Suwatte is **2.0**. Update the list in-app after adding. Library b
 
 JSON `chapters[]` are **sources in order**: a gallery URL is one chapter; a NovelCrow / AllPornComic / MangaDex series URL expands to **every** chapter on that title (optional `chapterRange`, blank = all, including chapters that show up later). Display numbers are then 1, 2, 3… so two sources that both have a “chapter 1” both appear. `"titles"` on a series row renames by **that site’s chapter numbers**. Replace `details.json` in the bucket to update the list. Gallery URLs can live in `details.json` → `chapters` (preferred) or a separate `chapters.json`.
 
-Gallery hosts: nhentai, HentaiRead, HentaiNexus, Hentai2Read, PandaChaika, E-Hentai / ExHentai, Hitomi, NovelCrow, AllPornComic, MangaDex. Series URLs: `https://novelcrow.com/comic/slug/`, `https://allporncomic.com/porncomic/slug/`, `https://mangadex.org/title/{uuid}/…` (MangaDex prefers English when the same number exists in multiple languages). Madara sites may need a one-time Cloudflare solve in WebView.
+Gallery hosts: nhentai, HentaiRead, HentaiNexus, Hentai2Read, PandaChaika, E-Hentai / ExHentai, Hitomi, NovelCrow, AllPornComic, MangaDex. Series URLs: `https://novelcrow.com/comic/slug/`, `https://allporncomic.com/porncomic/slug/`, `https://mangadex.org/title/{uuid}/…` (MangaDex prefers English when the same number exists in multiple languages). Madara sites may need a one-time Cloudflare solve in WebView. Series WebView opens the **first** JSON source’s public page (HR gallery, HN `/view`, NovelCrow `/comic/slug/`). Chapter WebView opens that chapter’s page (HN `/read`, NC chapter URL).
 
 `"chapterRange"` filters a series (`"2-"` = from 2 through newest, `"2-10"` = those chapters, `"5"` = only 5). `"pageRange"` crops pages in the reader: `"50"` = first 50 pages, `"3-50"` = pages 3–50, `"3-"` = page 3 through the end. If `details.json` title/cover/author are blank, the first series URL’s title and cover are filled in (local fields still win).
 
@@ -71,9 +71,9 @@ TachiManga wants **index.pb**:
 https://github.com/raahat-hossain/extensions/raw/cursor/r2-merge-extension-8f4a/repo/index.pb
 ```
 
-Sideload: [`repo/apk/tachiyomi-all.r2merge-v1.4.13.apk`](repo/apk/tachiyomi-all.r2merge-v1.4.13.apk)
+Sideload: [`repo/apk/tachiyomi-all.r2merge-v1.4.14.apk`](repo/apk/tachiyomi-all.r2merge-v1.4.14.apk)
 
-1.4.11 was signed with a throwaway debug cert, so TachiManga hides the update. Uninstall R2 Library, remove the repo, re-add `index.pb`, install **1.4.13**. Later updates keep this key.
+1.4.11 was signed with a throwaway debug cert, so TachiManga hides the update. Uninstall R2 Library, remove the repo, re-add `index.pb`, install **1.4.14**. Later updates keep this key.
 
 Settings: Account ID, Access Key, Secret, Bucket. Root Prefix empty if titles sit at bucket root. Optional public image URL (r2.dev / custom domain).
 
