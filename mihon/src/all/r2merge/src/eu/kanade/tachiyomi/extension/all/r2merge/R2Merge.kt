@@ -1009,8 +1009,7 @@ class R2Merge(
     override fun chapterListParse(response: Response) = throw UnsupportedOperationException()
     override fun getMangaUrl(manga: SManga): String = runCatching { mangaWebViewUrl(manga) }.getOrNull().orEmpty()
 
-    override fun getChapterUrl(chapter: SChapter): String =
-        publicChapterUrl(splitPageRange(chapter.url).first).orEmpty()
+    override fun getChapterUrl(chapter: SChapter): String = publicChapterUrl(splitPageRange(chapter.url).first).orEmpty()
 
     /**
      * Series WebView: first JSON source's public page (HR gallery, HN `/view`,
