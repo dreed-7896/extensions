@@ -18,7 +18,7 @@ import java.time.Instant
 internal const val MANGADEX_SITE = "https://mangadex.org"
 internal const val MANGADEX_API = "https://api.mangadex.org"
 internal const val MANGADEX_USER_AGENT =
-    "R2Library/1.4.15 (https://github.com/raahat-hossain/extensions)"
+    "R2Library/1.4.16 (https://github.com/raahat-hossain/extensions)"
 
 private val UUID_RE = Regex(
     """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""",

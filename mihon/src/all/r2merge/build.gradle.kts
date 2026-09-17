@@ -6,7 +6,7 @@ plugins {
 
 keiyoushi {
     name = "R2 Library"
-    versionCode = 15
+    versionCode = 16
     contentWarning = ContentWarning.NSFW
     libVersion = "1.4"
 
