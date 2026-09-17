@@ -73,7 +73,7 @@ enum RepoCatalog {
     }
 
     private static func parseProtobuf(_ data: Data) -> [RepoExtension] {
-        var cur = ProtoCursor(data)
+        var cur = ProtoCursor(data: data)
         while let (num, wire, bytes, _) = cur.next() {
             if num == 101 && wire == 2 {
                 return parseExtensionList(bytes)
@@ -83,7 +83,7 @@ enum RepoCatalog {
     }
 
     private static func parseExtensionList(_ data: Data) -> [RepoExtension] {
-        var cur = ProtoCursor(data)
+        var cur = ProtoCursor(data: data)
         var out: [RepoExtension] = []
         while let (num, wire, bytes, _) = cur.next() {
             if (num == 1 || num == 101) && wire == 2 {
@@ -96,7 +96,7 @@ enum RepoCatalog {
     }
 
     private static func parseExtension(_ data: Data) -> RepoExtension? {
-        var cur = ProtoCursor(data)
+        var cur = ProtoCursor(data: data)
         var name = ""
         var pkg = ""
         var apkUrl: String?
@@ -120,7 +120,7 @@ enum RepoCatalog {
     }
 
     private static func parseResources(_ data: Data) -> String? {
-        var cur = ProtoCursor(data)
+        var cur = ProtoCursor(data: data)
         while let (num, wire, bytes, _) = cur.next() {
             if num == 1 && wire == 2 {
                 let url = string(bytes)
@@ -131,7 +131,7 @@ enum RepoCatalog {
     }
 
     private static func parseSourceLang(_ data: Data) -> String? {
-        var cur = ProtoCursor(data)
+        var cur = ProtoCursor(data: data)
         while let (num, wire, bytes, _) = cur.next() {
             if num == 3 && wire == 2 {
                 let s = string(bytes)
@@ -149,6 +149,11 @@ enum RepoCatalog {
 private struct ProtoCursor {
     let data: Data
     var i = 0
+
+    init(data: Data) {
+        self.data = data
+        self.i = 0
+    }
 
     mutating func next() -> (Int, Int, Data, UInt64)? {
         guard i < data.count else { return nil }
