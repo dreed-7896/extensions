@@ -86,6 +86,19 @@ private val VOLUME_TOKEN = Regex("""\b(?:v|vol|volume)[\s._-]*\d+(?:\.\d+)?\b"""
 private val CHAPTER_TOKEN = Regex("""\b(?:ch|chap|chapter|episode|ep|#)[\s._-]*(\d+(?:\.\d+)?)""", RegexOption.IGNORE_CASE)
 private val STANDALONE_NUMBER = Regex("""(?:^|[\s._\-\[(])(\d+(?:\.\d+)?)(?=$|[\s._\-\])])""")
 private val ANY_NUMBER = Regex("""(\d+(?:\.\d+)?)""")
+private val LEADING_CHAPTER = Regex(
+    """^\s*(\d+(?:\.\d+)?)(?!\d)(?:\s*[.。．\-–—:)|]|\s+|$)""",
+)
+
+/**
+ * Madara/APC list titles look like `0.2 . The Snap - OLD - Chapter 2`.
+ * Prefer that leading index over a later `Chapter 2` token.
+ */
+fun leadingChapterNumber(rawName: String): Float? {
+    val name = rawName.trim()
+    if (name.isEmpty()) return null
+    return LEADING_CHAPTER.find(name)?.groupValues?.get(1)?.toFloatOrNull()?.takeIf { it >= 0f }
+}
 
 /**
  * Chapter number taken only from `Chapter 4` / `Ch.4` / `Ep 4` style tokens.

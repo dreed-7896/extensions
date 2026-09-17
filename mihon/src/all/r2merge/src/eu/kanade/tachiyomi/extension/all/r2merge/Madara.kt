@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension.all.r2merge
 
 import eu.kanade.tachiyomi.extension.all.r2merge.meta.SeriesMetadata
 import eu.kanade.tachiyomi.extension.all.r2merge.util.chapterNumberOf
+import eu.kanade.tachiyomi.extension.all.r2merge.util.leadingChapterNumber
 import eu.kanade.tachiyomi.extension.all.r2merge.util.overlayChapterNumber
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.Page
@@ -57,26 +58,55 @@ internal fun madaraRelativePath(url: String): String {
 
 internal fun parseMadaraChapterList(html: String, baseUrl: String, scanlator: String): List<ParsedChapter> {
     val document = Jsoup.parse(html, baseUrl)
-    return document.select("li.wp-manga-chapter a, .wp-manga-chapter > a")
-        .mapNotNull { link ->
-            val href = link.absUrl("href").ifBlank { link.attr("href") }.trim()
-            if (href.isBlank() || isMadaraSeriesUrl(href)) return@mapNotNull null
-            val title = link.ownText().ifBlank { link.text() }.trim()
-            if (title.isBlank()) return@mapNotNull null
-            val number = overlayChapterNumber(title)
-                ?: chapterNumberOf(title).takeIf { it >= 0f }
-                ?: chapterNumberOf(href).takeIf { it >= 0f }
-                ?: 0f
-            ParsedChapter(
-                title = title,
-                number = number,
-                url = href.substringBefore('?').trimEnd('/') + "/",
-                scanlator = scanlator,
-                explicitNumber = number > 0f,
-                sourceNumber = number,
-            )
-        }
+    val items = document.select("li.wp-manga-chapter, .wp-manga-chapter").ifEmpty {
+        document.select("li.wp-manga-chapter a, .wp-manga-chapter > a")
+    }
+    return items.mapNotNull { item ->
+        val link = if (item.tagName() == "a") item else item.selectFirst("a") ?: return@mapNotNull null
+        val href = link.absUrl("href").ifBlank { link.attr("href") }.trim()
+        if (href.isBlank() || isMadaraSeriesUrl(href)) return@mapNotNull null
+        val title = link.text().trim().ifBlank { link.ownText().trim() }
+        if (title.isBlank()) return@mapNotNull null
+        val attrNumber = listOf("data-num", "data-chapter", "data-chapter-number")
+            .firstNotNullOfOrNull { item.attr(it).trim().toFloatOrNull() }
+        val number = madaraChapterNumber(title, href, attrNumber)
+        ParsedChapter(
+            title = title,
+            number = number,
+            url = href.substringBefore('?').trimEnd('/') + "/",
+            scanlator = scanlator,
+            explicitNumber = number > 0f,
+            sourceNumber = number,
+        )
+    }
         .distinctBy { it.url }
+}
+
+/** Site chapter number for `titles` / `chapterRange`. Leading `0.2 . …` wins over a later `Chapter 2`. */
+internal fun madaraChapterNumber(title: String, href: String, attrNumber: Float? = null): Float {
+    attrNumber?.takeIf { it > 0f }?.let { return it }
+    leadingChapterNumber(title)?.takeIf { it > 0f }?.let { return it }
+    slugChapterNumber(href)?.takeIf { it > 0f }?.let { return it }
+    overlayChapterNumber(title)?.let { return it }
+    chapterNumberOf(title).takeIf { it >= 0f }?.let { return it }
+    chapterNumberOf(href).takeIf { it >= 0f }?.let { return it }
+    return 0f
+}
+
+private val SLUG_DECIMAL = Regex("""^(\d+)-(\d+)$""")
+private val SLUG_PLAIN = Regex("""^(\d+(?:\.\d+)?)$""")
+private val SLUG_PREFIX = Regex("""^(?:ch(?:apter)?|ep(?:isode)?)-?""", RegexOption.IGNORE_CASE)
+
+/** `/0-2/` or `/chapter-0-2/` → 0.2; `/chapter-2/` → 2. */
+private fun slugChapterNumber(url: String): Float? {
+    val seg = url.trim().substringBefore('?').substringBefore('#').trimEnd('/')
+        .substringAfterLast('/').replace('_', '-')
+    if (seg.isEmpty()) return null
+    val stripped = seg.replace(SLUG_PREFIX, "")
+    SLUG_DECIMAL.matchEntire(stripped)?.let { match ->
+        return "${match.groupValues[1]}.${match.groupValues[2]}".toFloatOrNull()
+    }
+    return SLUG_PLAIN.matchEntire(stripped)?.groupValues?.get(1)?.toFloatOrNull()
 }
 
 internal fun parseMadaraPages(html: String, pageUrl: String): List<Page> {
