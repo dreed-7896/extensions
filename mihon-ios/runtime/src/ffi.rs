@@ -4,6 +4,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 #[derive(Deserialize, Default)]
@@ -63,12 +64,28 @@ pub extern "C" fn mihon_set_js(cb: Option<crate::extra_shims::JsCallback>) {
     crate::extra_shims::set_host_js(cb);
 }
 
+fn panic_msg(err: Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = err.downcast_ref::<&str>() {
+        format!("engine panic: {s}")
+    } else if let Some(s) = err.downcast_ref::<String>() {
+        format!("engine panic: {s}")
+    } else {
+        "engine panic".into()
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn mihon_open_file(apk_path: *const c_char, err: *mut *mut c_char) -> *mut Engine {
-    match cstr_to_str(apk_path).and_then(Engine::open_file) {
-        Ok(engine) => Box::into_raw(Box::new(engine)),
-        Err(e) => {
+    match catch_unwind(AssertUnwindSafe(|| {
+        cstr_to_str(apk_path).and_then(Engine::open_file)
+    })) {
+        Ok(Ok(engine)) => Box::into_raw(Box::new(engine)),
+        Ok(Err(e)) => {
             set_err(err, e);
+            ptr::null_mut()
+        }
+        Err(p) => {
+            set_err(err, panic_msg(p));
             ptr::null_mut()
         }
     }
@@ -115,17 +132,21 @@ pub extern "C" fn mihon_call(
         }
     };
     let args: Args = serde_json::from_str(args_raw).unwrap_or_default();
-    let result = dispatch(engine, op, args);
+    let result = catch_unwind(AssertUnwindSafe(|| dispatch(engine, op, args)));
     match result {
-        Ok(v) => match to_c_json(v) {
+        Ok(Ok(v)) => match to_c_json(v) {
             Ok(p) => p,
             Err(e) => {
                 set_err(err, e);
                 ptr::null_mut()
             }
         },
-        Err(e) => {
+        Ok(Err(e)) => {
             set_err(err, e);
+            ptr::null_mut()
+        }
+        Err(p) => {
+            set_err(err, panic_msg(p));
             ptr::null_mut()
         }
     }
@@ -155,7 +176,11 @@ fn dispatch(engine: &mut Engine, op: &str, args: Args) -> Result<Value, String> 
             let (entries, has_next) = engine.search(args.source, args.page, &args.query)?;
             Ok(json!({ "entries": entries, "hasNext": has_next }))
         }
-        "details" => Ok(json!(engine.details(args.source, &args.url, &args.title)?)),
+        "details" => Ok(json!(engine.details(
+            args.source,
+            &args.url,
+            &args.title
+        )?)),
         "chapters" => Ok(json!({
             "chapters": engine.chapters(args.source, &args.url, &args.title)?
         })),

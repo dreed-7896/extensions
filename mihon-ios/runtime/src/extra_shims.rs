@@ -1086,10 +1086,7 @@ fn member_json(vm: &Vm, args: &[JValue]) -> JsonVal {
             .get(index as usize)
             .map(|(_, v)| v.clone())
             .unwrap_or(JsonVal::Null),
-        JsonVal::Array(items) => items
-            .get(index as usize)
-            .cloned()
-            .unwrap_or(JsonVal::Null),
+        JsonVal::Array(items) => items.get(index as usize).cloned().unwrap_or(JsonVal::Null),
         other => other,
     }
 }
@@ -1107,26 +1104,29 @@ fn decode_int_element(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
 }
 
 fn decode_double_value(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
-    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null))
-        .unwrap_or(JsonVal::Null);
+    let v =
+        decoder_json(vm, args.first().copied().unwrap_or(JValue::Null)).unwrap_or(JsonVal::Null);
     Ok(JValue::Double(json_as_f64(&v)))
 }
 
 fn decode_float_value(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
-    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null))
-        .unwrap_or(JsonVal::Null);
+    let v =
+        decoder_json(vm, args.first().copied().unwrap_or(JValue::Null)).unwrap_or(JsonVal::Null);
     Ok(JValue::Float(json_as_f64(&v) as f32))
 }
 
 fn decode_int_value(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
-    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null))
-        .unwrap_or(JsonVal::Null);
+    let v =
+        decoder_json(vm, args.first().copied().unwrap_or(JValue::Null)).unwrap_or(JsonVal::Null);
     Ok(JValue::Int(json_as_f64(&v) as i32))
 }
 
 fn decode_not_null_mark(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
     let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null));
-    Ok(JValue::Int(i32::from(!matches!(v, Some(JsonVal::Null) | None))))
+    Ok(JValue::Int(i32::from(!matches!(
+        v,
+        Some(JsonVal::Null) | None
+    ))))
 }
 
 fn decode_null_value(_vm: &mut Vm, _args: &[JValue]) -> Result<JValue, NatErr> {

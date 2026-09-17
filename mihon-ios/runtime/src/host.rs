@@ -240,7 +240,12 @@ fn http_source_headers_builder(vm: &mut Vm, _args: &[JValue]) -> Result<JValue, 
 fn http_source_get_headers(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
     let this = args.first().copied().unwrap_or(JValue::Null);
     let builder = vm
-        .invoke_virtual_args(this, "headersBuilder", "()Lokhttp3/Headers$Builder;", vec![])
+        .invoke_virtual_args(
+            this,
+            "headersBuilder",
+            "()Lokhttp3/Headers$Builder;",
+            vec![],
+        )
         .map_err(jvm_to_nat)?;
     vm.invoke_virtual_args(builder, "build", "()Lokhttp3/Headers;", vec![])
         .map_err(jvm_to_nat)
@@ -258,9 +263,7 @@ fn http_source_image_request(vm: &mut Vm, args: &[JValue]) -> Result<JValue, Nat
     let this = args.first().copied().unwrap_or(JValue::Null);
     let page = args.get(1).copied().unwrap_or(JValue::Null);
     let url = match vm.payload_of(page) {
-        Some(Native::SPPage {
-            image_url, url, ..
-        }) => {
+        Some(Native::SPPage { image_url, url, .. }) => {
             if image_url.is_empty() {
                 url
             } else {
@@ -408,7 +411,9 @@ fn stub_class(vm: &mut Vm, desc: &str) -> Result<(), String> {
         f: stub_ctor,
     })
     .map_err(|e| e.to_string())?;
-    vm.ensure_class_by_desc(desc).map(|_| ()).map_err(|e| e.to_string())
+    vm.ensure_class_by_desc(desc)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 fn parse_no_method(err: &str) -> Option<(String, String, String)> {
@@ -416,7 +421,11 @@ fn parse_no_method(err: &str) -> Option<(String, String, String)> {
     let found = rest.find(" found (on ")?;
     let head = rest[..found].trim();
     let class_part = rest[found + " found (on ".len()..].trim();
-    let class = class_part.split_whitespace().next()?.trim_matches(',').to_string();
+    let class = class_part
+        .split_whitespace()
+        .next()?
+        .trim_matches(',')
+        .to_string();
     let class = if class.ends_with(';') {
         class
     } else if class.starts_with('L') {
@@ -535,12 +544,7 @@ fn install_missing_static(vm: &mut Vm, owner: &str, name: &str, ty: &str) -> Res
     Ok(())
 }
 
-fn well_known_static(
-    vm: &mut Vm,
-    owner: &str,
-    name: &str,
-    ty: &str,
-) -> Result<JValue, String> {
+fn well_known_static(vm: &mut Vm, owner: &str, name: &str, ty: &str) -> Result<JValue, String> {
     match (owner, name, ty) {
         ("Landroid/os/Build$VERSION;", "SDK_INT", "I") => Ok(JValue::Int(34)),
         ("Landroid/os/Build$VERSION;", "SDK_INT", "Ljava/lang/Integer;") => Ok(JValue::Int(34)),

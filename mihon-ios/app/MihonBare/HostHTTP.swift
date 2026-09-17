@@ -29,14 +29,47 @@ enum HostHTTP {
             return strdupJson(fail(0, "bad request"))
         }
 
-        var result = fetch(req, url: url)
+        var result: EngineResp
+        let host = url.host
+        let useWeb = host.map { CloudflareSolver.usesWeb($0) || CloudflareSolver.hasClearance(for: $0) } ?? false
+        if useWeb,
+           let web = CloudflareSolver.fetchBlocking(
+            method: req.method,
+            url: url,
+            headers: req.headers,
+            body: req.body
+           )
+        {
+            result = EngineResp(
+                code: web.code,
+                message: web.message,
+                headers: web.headers,
+                bodyB64: web.bodyB64
+            )
+        } else {
+            result = fetch(req, url: url)
+        }
         if isCloudflare(result) {
             let solved = CloudflareSolver.solveBlocking(urlString: req.url)
             if solved {
-                result = fetch(req, url: url)
-                if isCloudflare(result) {
-                    Thread.sleep(forTimeInterval: 0.4)
+                if let web = CloudflareSolver.fetchBlocking(
+                    method: req.method,
+                    url: url,
+                    headers: req.headers,
+                    body: req.body
+                ) {
+                    result = EngineResp(
+                        code: web.code,
+                        message: web.message,
+                        headers: web.headers,
+                        bodyB64: web.bodyB64
+                    )
+                } else {
                     result = fetch(req, url: url)
+                    if isCloudflare(result) {
+                        Thread.sleep(forTimeInterval: 0.4)
+                        result = fetch(req, url: url)
+                    }
                 }
             }
             if isCloudflare(result) {

@@ -1,19 +1,42 @@
 import Foundation
 
-struct RepoExtension: Identifiable, Decodable {
-    var id: String { pkg }
+struct RepoExtension: Identifiable, Decodable, Hashable {
+    var id: String { "\(repoID)|\(pkg)" }
+    var repoID: String = ""
+    var repoName: String = ""
+    var repoIndex: String = ""
     let name: String
     let pkg: String
     let apk: String
     let apkUrl: String?
     let lang: String?
 
-    init(name: String, pkg: String, apk: String, apkUrl: String?, lang: String?) {
+    init(
+        name: String,
+        pkg: String,
+        apk: String,
+        apkUrl: String?,
+        lang: String?,
+        repoID: String = "",
+        repoName: String = "",
+        repoIndex: String = ""
+    ) {
         self.name = name
         self.pkg = pkg
         self.apk = apk
         self.apkUrl = apkUrl
         self.lang = lang
+        self.repoID = repoID
+        self.repoName = repoName
+        self.repoIndex = repoIndex
+    }
+
+    func tagged(repo: RepoSpec) -> RepoExtension {
+        var copy = self
+        copy.repoID = repo.id
+        copy.repoName = repo.name
+        copy.repoIndex = repo.index.absoluteString
+        return copy
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -52,7 +75,7 @@ struct RepoExtension: Identifiable, Decodable {
     }
 }
 
-struct SourceInfo: Identifiable, Decodable {
+struct SourceInfo: Identifiable, Decodable, Hashable {
     var id: Int { index }
     let index: Int
     let name: String

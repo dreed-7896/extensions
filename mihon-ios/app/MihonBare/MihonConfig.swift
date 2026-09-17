@@ -1,9 +1,25 @@
 import Foundation
 
+struct RepoSpec: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let index: URL
+}
+
 enum MihonConfig {
-    static let repoIndex = URL(
-        string: "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"
-    )!
+    static let repos: [RepoSpec] = [
+        RepoSpec(
+            id: "keiyoushi",
+            name: "Keiyoushi",
+            index: URL(string: "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb")!
+        ),
+        RepoSpec(
+            id: "cursed",
+            name: "Cursed",
+            index: URL(string: "https://github.com/yuzono/cursed-manga-repo/raw/repo/index.pb")!
+        ),
+    ]
+
     /// Mihon default desktop Chrome UA. Used for both WKWebView CF solves and
     /// every URLSession request — clearance cookies are bound to this string,
     /// and mobile HTML breaks desktop CSS selectors in extensions.

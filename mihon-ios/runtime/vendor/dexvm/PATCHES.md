@@ -7,3 +7,10 @@
 - `vm/native/serialization.rs`: kotlinx polymorphic `type` matching accepts `@SerialName` (`cover_art`) and generated class names (`CoverArtDto`), and matches KClass by class id not object identity. `decodeElementIndex` matches JSON keys by serial name (skip unknown), `decodeSequentially` is false like real Json, arrays are positional, and `decodeDoubleElement` / `decodeFloatElement` exist on `StreamingJsonDecoder` and `CompositeDecoder` (with and without index).
 - `vm/native/keiyoushi.rs`: HttpSource `getPopularManga` / `fetchPopularManga` defaults use `getClient().newCall().awaitSuccess()` so Cloudflare 403 is not parsed as an empty catalog. Default `*Request` joins `baseUrl` + path and forwards source headers. `getPageList` is `fetchPageList.awaitSingle()` like 1.4 HttpSource.
 - `keiyoushi.rs`: classic request/parse also rejects non-2xx.
+- `vm/native/mod.rs`: `Intrinsics.areEqual` / `inv_virt` treat DEX `Int(0)` as a null
+  reference. Hiperdex (and other Madara sources) crashed the IPA on source select.
+- `vm/native/injekt`: `getType`/`getInstance` are matched by method name (not only the
+  base class). `getInstance` peeks the caller's next `check-cast` so
+  `Injekt.get<Json>()` is not allocated as `Application`. Dex `Signature`
+  annotations are parsed as `annotation_set_item` + type_ids (was string_ids +
+  a single annotation_item, so every FullTypeReference looked untyped).

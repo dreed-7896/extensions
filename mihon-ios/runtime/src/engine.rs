@@ -203,10 +203,7 @@ impl Engine {
             |ext| ext.pages(&src, &chapter),
         )?;
         fill_image_urls(&mut self.ext, &src, &mut list);
-        Ok(list
-            .into_iter()
-            .map(|p| page_out(p, &base))
-            .collect())
+        Ok(list.into_iter().map(|p| page_out(p, &base)).collect())
     }
 
     /// Fetch image bytes through the extension's OkHttpClient (referer,
@@ -313,7 +310,9 @@ fn mihon_get<T>(
 ) -> Result<T, String> {
     match run_healed(ext, primary) {
         Ok(v) => Ok(v),
-        Err(msg) if fallback_ok(&msg) => run_healed(ext, secondary).map_err(|m2| format!("{msg} / {m2}")),
+        Err(msg) if fallback_ok(&msg) => {
+            run_healed(ext, secondary).map_err(|m2| format!("{msg} / {m2}"))
+        }
         Err(msg) => Err(msg),
     }
 }
@@ -326,9 +325,7 @@ fn mihon_get3<T>(
 ) -> Result<T, String> {
     match mihon_get(ext, a, b) {
         Ok(v) => Ok(v),
-        Err(msg) if fallback_ok(&msg) => {
-            run_healed(ext, c).map_err(|m3| format!("{msg} / {m3}"))
-        }
+        Err(msg) if fallback_ok(&msg) => run_healed(ext, c).map_err(|m3| format!("{msg} / {m3}")),
         Err(msg) => Err(msg),
     }
 }
@@ -348,9 +345,7 @@ fn fallback_ok(msg: &str) -> bool {
     {
         return false;
     }
-    m.contains("resolution error")
-        || m.contains("no method")
-        || m.contains("class not found")
+    m.contains("resolution error") || m.contains("no method") || m.contains("class not found")
 }
 
 /// Mihon `HttpSource.imageRequest(page)` then the source OkHttp client.
@@ -386,12 +381,9 @@ fn image_via_request(
 /// Cover / standalone URL: `GET(url, headers)` on the source client.
 /// Never `imageRequest` — several sources overload that for page tokens.
 fn image_via_client(ext: &mut Keiyoushi, src: &Source, url: &str) -> Result<Vec<u8>, JvmError> {
-    let headers = ext.ctx().invoke_on(
-        src.inst(),
-        "getHeaders",
-        "()Lokhttp3/Headers;",
-        &[],
-    )?;
+    let headers = ext
+        .ctx()
+        .invoke_on(src.inst(), "getHeaders", "()Lokhttp3/Headers;", &[])?;
     let pairs = match ext.ctx().vm().payload_of(headers) {
         Some(Native::Headers(h)) => h,
         _ => Vec::new(),

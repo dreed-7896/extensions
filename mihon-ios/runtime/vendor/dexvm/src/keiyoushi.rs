@@ -445,11 +445,7 @@ impl Keiyoushi {
             Err(e) => return Err(e),
         };
 
-        let (values, error) = match self
-            .ctx
-            .vm()
-            .payload_of(ob)
-        {
+        let (values, error) = match self.ctx.vm().payload_of(ob) {
             Some(Native::RxObservable { values, error, .. }) => (values.clone(), error),
             _ => return Ok(None),
         };

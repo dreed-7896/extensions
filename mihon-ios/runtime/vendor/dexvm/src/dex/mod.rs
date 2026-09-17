@@ -293,7 +293,7 @@ impl DexFile {
         let _data_off = c.u32()?;
 
         // --- string ids ---
-        let mut strings = Vec::with_capacity(string_ids_size);
+        let mut strings: Vec<Arc<str>> = Vec::with_capacity(string_ids_size);
         for i in 0..string_ids_size {
             let off = c.u32_at(string_ids_off + i * 4)? as usize;
             let sc = &mut Cursor::new(data);
@@ -361,9 +361,15 @@ impl DexFile {
         }
 
         // --- class defs ---
-        let signature_type_idx = strings
+        // encoded_annotation.type_idx is a type_ids index, not a string_ids index.
+        let signature_type_idx = types
             .iter()
-            .position(|s: &Arc<str>| s.as_ref() == "Ldalvik/annotation/Signature;")
+            .position(|&sid| {
+                matches!(
+                    strings.get(sid as usize),
+                    Some(s) if s.as_ref() == "Ldalvik/annotation/Signature;"
+                )
+            })
             .map(|i| i as u32);
         let mut classes = Vec::with_capacity(class_defs_size);
         for i in 0..class_defs_size {
@@ -479,6 +485,33 @@ impl DexFile {
 /// the runtime generic signature string from any
 /// `Ldalvik/annotation/Signature;` class annotation (value = array of
 /// strings).
+fn signature_from_value(v: EncodedValue, strings: &[Arc<str>]) -> Option<String> {
+    match v {
+        EncodedValue::Array(items) => {
+            let mut sig = String::new();
+            for it in items {
+                if let EncodedValue::String(s) = it {
+                    if let Some(t) = strings.get(s as usize) {
+                        sig.push_str(t);
+                    }
+                }
+            }
+            if sig.is_empty() {
+                None
+            } else {
+                Some(sig)
+            }
+        }
+        EncodedValue::String(s) => strings.get(s as usize).map(|t| t.to_string()),
+        _ => None,
+    }
+}
+
+/// Parses the class annotations of the class whose `annotations_off`
+/// (class_def field) points at an `annotations_directory_item` and returns
+/// the runtime generic signature string from any
+/// `Ldalvik/annotation/Signature;` class annotation (value = array of
+/// strings).
 pub(crate) fn parse_runtime_signature(
     data: &[u8],
     annotations_off: usize,
@@ -495,35 +528,36 @@ pub(crate) fn parse_runtime_signature(
     if class_annotations_off == 0 {
         return Ok(None);
     }
+    // annotation_set_item { uint size; annotation_off_item[size] entries }
+    // annotation_off_item { uint annotation_off } -> annotation_item
     c.seek(class_annotations_off)?;
-    let _visibility = c.u8()?;
-    let n = c.uleb128()? as usize;
+    let n = c.u32()? as usize;
+    if n == 0 || n > 4096 {
+        return Ok(None);
+    }
+    let mut offs = Vec::with_capacity(n);
     for _ in 0..n {
-        let ann_off = c.uleb128()? as usize;
+        offs.push(c.u32()? as usize);
+    }
+    for ann_off in offs {
+        if ann_off == 0 || ann_off >= data.len() {
+            continue;
+        }
         let ac = &mut Cursor::new(data);
         ac.seek(ann_off)?;
+        let _visibility = ac.u8()?;
         let type_idx = ac.uleb128()?;
         let sz = ac.uleb128()? as usize;
-        let mut elements = Vec::with_capacity(sz);
+        let mut hit = None;
         for _ in 0..sz {
-            let name_idx = ac.uleb128()?;
+            let _name_idx = ac.uleb128()?;
             let v = EncodedValue::decode(ac)?;
-            elements.push((name_idx, v));
-        }
-        if type_idx == sig_type_idx {
-            for (_, v) in elements {
-                if let EncodedValue::Array(items) = v {
-                    let mut sig = String::new();
-                    for it in items {
-                        if let EncodedValue::String(s) = it {
-                            sig.push_str(&strings[s as usize]);
-                        }
-                    }
-                    if !sig.is_empty() {
-                        return Ok(Some(sig));
-                    }
-                }
+            if type_idx == sig_type_idx && hit.is_none() {
+                hit = signature_from_value(v, strings);
             }
+        }
+        if hit.is_some() {
+            return Ok(hit);
         }
     }
     Ok(None)

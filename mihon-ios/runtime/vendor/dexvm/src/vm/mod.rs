@@ -170,6 +170,9 @@ pub struct Vm {
     /// class count when the injekt registry was last rebuilt; the scan re-runs
     /// whenever new classes have been loaded since.
     injekt_scanned_classes: usize,
+    /// Caller of the native currently running from bytecode: (class, slot, ret_pc).
+    /// Injekt `getInstance` peeks the following `check-cast` for the concrete type.
+    pub native_ret: Option<(u32, u32, usize)>,
     loading: Vec<(u32, usize)>,
 }
 
@@ -218,6 +221,7 @@ impl Vm {
             loading: Vec::new(),
             injekt_type_by_subclass: HashMap::new(),
             injekt_scanned_classes: 0,
+            native_ret: None,
             cache_root: None,
             shared_preferences: HashMap::new(),
             shared_preferences_path: None,
@@ -314,9 +318,24 @@ impl Vm {
         use crate::dex::insn::{decode_all, Insn};
         // Phase 1 (immutable): collect (subclass desc, type desc) pairs.
         let mut pairs: Vec<(String, String)> = Vec::new();
-        let get_type_cls = "Luy/kohesive/injekt/api/FullTypeReference;";
-        let factory_cls = "Luy/kohesive/injekt/api/InjektFactory;";
         for class in 0..self.classes.len() as u32 {
+            let class_desc = self
+                .str_of(self.classes[class as usize].descriptor)
+                .to_string();
+            let extends_type_ref = {
+                let mut cur = Some(class);
+                let mut hit = false;
+                for _ in 0..16 {
+                    let Some(id) = cur else { break };
+                    let d = self.str_of(self.classes[id as usize].descriptor);
+                    if d.contains("TypeReference") {
+                        hit = true;
+                        break;
+                    }
+                    cur = self.classes[id as usize].superclass;
+                }
+                hit
+            };
             for m in &self.classes[class as usize].methods {
                 let Some(code) = &m.code else {
                     continue;
@@ -340,6 +359,18 @@ impl Vm {
                         Insn::NewInstance(reg, type_idx) => {
                             if let Some(slot) = last_new.get_mut(*reg as usize) {
                                 *slot = Some(*type_idx);
+                            }
+                        }
+                        Insn::Move(dst, src) | Insn::MoveWide(dst, src) => {
+                            let src = *src as usize;
+                            let dst = *dst as usize;
+                            let ln = last_new.get(src).copied().flatten();
+                            let tr = type_reg.get(src).cloned().flatten();
+                            if let Some(slot) = last_new.get_mut(dst) {
+                                *slot = ln;
+                            }
+                            if let Some(slot) = type_reg.get_mut(dst) {
+                                *slot = tr;
                             }
                         }
                         Insn::MoveResult(reg) | Insn::MoveResultWide(reg) => {
@@ -371,14 +402,29 @@ impl Vm {
                                 .map(|s| s.as_ref())
                                 .unwrap_or("");
                             match name {
-                                "getType" if owner == get_type_cls => {
+                                // `getType` is often invoke-virtual on the
+                                // anonymous FullTypeReference subclass, not
+                                // the base class named in the const. injectLazy
+                                // lambdas call it on `this`.
+                                "getType" => {
                                     let recv = args.reg_at(0) as usize;
-                                    if let Some(Some(sid)) = last_new.get(recv) {
-                                        pending_get_type =
-                                            Some(dex.type_descriptor(*sid).to_string());
+                                    pending_get_type = last_new
+                                        .get(recv)
+                                        .copied()
+                                        .flatten()
+                                        .map(|sid| dex.type_descriptor(sid).to_string())
+                                        .or_else(|| extends_type_ref.then(|| class_desc.clone()));
+                                }
+                                // `Injekt.get<T>()` hits InjektScope.get /
+                                // InjektFactory.getInstance depending on
+                                // which interface the dex linked.
+                                "getInstance" if args.count >= 2 => {
+                                    let targ = args.reg_at(1) as usize;
+                                    if let Some(Some(sub)) = type_reg.get(targ) {
+                                        want_result = Some(sub.clone());
                                     }
                                 }
-                                "getInstance" if owner == factory_cls => {
+                                "get" if args.count >= 2 && owner.contains("njekt") => {
                                     let targ = args.reg_at(1) as usize;
                                     if let Some(Some(sub)) = type_reg.get(targ) {
                                         want_result = Some(sub.clone());
@@ -406,6 +452,49 @@ impl Vm {
             let t_id = self.intern(&t);
             self.injekt_type_by_subclass.insert(sub_id, t_id);
         }
+    }
+
+    /// Descriptor of the `check-cast` that follows the current native invoke
+    /// (`move-result` + optional Kotlin null-check, then check-cast).
+    pub fn peek_caller_check_cast(&self) -> Option<String> {
+        use crate::dex::insn::{decode_all, Insn};
+        let (class, slot, ret_pc) = self.native_ret?;
+        let (dex_idx, insns) = {
+            let m = self
+                .classes
+                .get(class as usize)?
+                .methods
+                .get(slot as usize)?;
+            (m.dex_idx, m.code.as_ref()?.insns.clone())
+        };
+        let decoded = decode_all(&insns).ok()?;
+        let mut i = decoded.units.iter().position(|&u| u as usize == ret_pc)?;
+        let dex = self.dex_at(dex_idx);
+        while i < decoded.insns.len() {
+            match &decoded.insns[i] {
+                Insn::MoveResult(_) | Insn::MoveResultWide(_) => i += 1,
+                Insn::Invoke(_, method_idx, _) => {
+                    let name = dex
+                        .methods
+                        .get(*method_idx as usize)
+                        .and_then(|mr| dex.strings.get(mr.name as usize))
+                        .map(|s| s.as_ref())
+                        .unwrap_or("");
+                    if name.starts_with("checkNotNull")
+                        || name == "throwUninitializedPropertyAccessException"
+                    {
+                        i += 1;
+                    } else {
+                        return None;
+                    }
+                }
+                Insn::CheckCast(_, type_idx) => {
+                    return Some(dex.type_descriptor(*type_idx).to_string());
+                }
+                _ => return None,
+            }
+        }
+        None
     }
 
     // ---- class loading ----

@@ -2,7 +2,18 @@ import Foundation
 import UIKit
 import WebKit
 
+struct WebFetchResult {
+    var code: Int
+    var message: String
+    var headers: [(String, String)]
+    var bodyB64: String
+}
+
 enum CloudflareSolver {
+    private static let lock = NSLock()
+    private static var webViews: [String: WKWebView] = [:]
+    private static var webHosts = Set<String>()
+
     static func hasClearance(for host: String) -> Bool {
         let cookies = HTTPCookieStorage.shared.cookies ?? []
         return cookies.contains { cookie in
@@ -11,13 +22,20 @@ enum CloudflareSolver {
         }
     }
 
+    static func usesWeb(_ host: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return webHosts.contains(host)
+    }
+
     static func domainMatches(_ cookieDomain: String, host: String) -> Bool {
         let domain = cookieDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
         return host == domain || host.hasSuffix(".\(domain)") || domain.hasSuffix(host)
     }
 
     /// Called from the engine thread. Presents a WKWebView on the main thread
-    /// so Turnstile/JS challenges can be solved, then copies cookies out.
+    /// so Turnstile/JS challenges can be solved, then keeps that WebView for
+    /// later fetches (same TLS stack as cf_clearance — URLSession 403s after).
     static func solveBlocking(urlString: String) -> Bool {
         let box = NSMutableArray()
         let sem = DispatchSemaphore(value: 0)
@@ -32,12 +50,27 @@ enum CloudflareSolver {
         return (box.firstObject as? Bool) ?? false
     }
 
+    static func fetchBlocking(
+        method: String,
+        url: URL,
+        headers: [(String, String)],
+        body: String?
+    ) -> WebFetchResult? {
+        let box = FetchBox()
+        let sem = DispatchSemaphore(value: 0)
+        DispatchQueue.main.async {
+            Task { @MainActor in
+                box.result = await fetch(method: method, url: url, headers: headers, body: body)
+                sem.signal()
+            }
+        }
+        _ = sem.wait(timeout: .now() + 40)
+        return box.result
+    }
+
     @MainActor
     private static func solve(urlString: String) async -> Bool {
         guard let url = URL(string: urlString), let host = url.host else { return false }
-        // Always show the WebView when a live request was challenged.
-        // A leftover cf_clearance is often stale (UA / IP bound).
-
         let window = overlayWindow()
         let controller = ChallengeController(url: url)
         controller.heldWindow = window
@@ -45,9 +78,129 @@ enum CloudflareSolver {
         window.makeKeyAndVisible()
 
         let ok = await controller.waitForClearance(host: host)
+        if let webView = controller.takeWebView() {
+            adopt(host: host, webView: webView)
+        }
         window.isHidden = true
         window.rootViewController = nil
         return ok
+    }
+
+    @MainActor
+    fileprivate static func adopt(host: String, webView: WKWebView) {
+        webView.removeFromSuperview()
+        webView.navigationDelegate = nil
+        lock.lock()
+        webViews[host] = webView
+        webHosts.insert(host)
+        lock.unlock()
+    }
+
+    @MainActor
+    private static func view(for host: String) -> WKWebView {
+        lock.lock()
+        let existing = webViews[host]
+        lock.unlock()
+        if let existing { return existing }
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: config)
+        webView.customUserAgent = MihonConfig.userAgent
+        lock.lock()
+        webViews[host] = webView
+        webHosts.insert(host)
+        lock.unlock()
+        return webView
+    }
+
+    @MainActor
+    private static func fetch(
+        method: String,
+        url: URL,
+        headers: [(String, String)],
+        body: String?
+    ) async -> WebFetchResult? {
+        guard let host = url.host else { return nil }
+        let webView = view(for: host)
+        await seedCookies(into: webView)
+        if webView.url?.host == nil {
+            _ = await load(webView, URL(string: "https://\(host)/") ?? url)
+        }
+        var hdrs: [String: String] = [:]
+        for (k, v) in headers {
+            let key = k.lowercased()
+            if key == "cookie" || key == "user-agent" || key == "host" { continue }
+            hdrs[k] = v
+        }
+        let js = """
+        const init = { method: method, credentials: 'include', redirect: 'follow', headers: headers || {} };
+        if (body) { init.body = body; }
+        const r = await fetch(url, init);
+        const buf = await r.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        const chunk = 32768;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        const out = [];
+        r.headers.forEach((v, k) => out.push([k, v]));
+        return { code: r.status, message: r.statusText || '', headers: out, bodyB64: btoa(bin) };
+        """
+        var args: [String: Any] = [
+            "url": url.absoluteString,
+            "method": method,
+            "headers": hdrs,
+        ]
+        if let body { args["body"] = body }
+        do {
+            let raw = try await webView.callAsyncJavaScript(
+                js,
+                arguments: args,
+                in: nil,
+                in: .page
+            )
+            return parseJS(raw)
+        } catch {
+            return nil
+        }
+    }
+
+    @MainActor
+    private static func seedCookies(into webView: WKWebView) async {
+        let cookies = HTTPCookieStorage.shared.cookies ?? []
+        guard !cookies.isEmpty else { return }
+        let store = webView.configuration.websiteDataStore.httpCookieStore
+        for cookie in cookies {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                store.setCookie(cookie) { cont.resume() }
+            }
+        }
+    }
+
+    @MainActor
+    private static func load(_ webView: WKWebView, _ url: URL) async -> Bool {
+        var req = URLRequest(url: url)
+        req.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+        webView.load(req)
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        return true
+    }
+
+    private static func parseJS(_ raw: Any?) -> WebFetchResult? {
+        guard let dict = raw as? [String: Any] else { return nil }
+        let code = (dict["code"] as? Int) ?? (dict["code"] as? Double).map { Int($0) } ?? 0
+        let message = dict["message"] as? String ?? ""
+        let bodyB64 = dict["bodyB64"] as? String ?? ""
+        var headers: [(String, String)] = []
+        if let rows = dict["headers"] as? [[Any]] {
+            for row in rows {
+                if row.count >= 2, let k = row[0] as? String, let v = row[1] as? String {
+                    headers.append((k, v))
+                }
+            }
+        }
+        return WebFetchResult(code: code, message: message, headers: headers, bodyB64: bodyB64)
     }
 
     @MainActor
@@ -68,6 +221,10 @@ enum CloudflareSolver {
     }
 }
 
+private final class FetchBox: @unchecked Sendable {
+    var result: WebFetchResult?
+}
+
 @MainActor
 private final class ChallengeController: UIViewController, WKNavigationDelegate {
     private let target: URL
@@ -84,6 +241,12 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    func takeWebView() -> WKWebView? {
+        let view = webView
+        webView = nil
+        return view
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -188,7 +351,7 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
             )
             cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
             let hit = cookies.contains {
-                ($0.name == "cf_clearance" || $0.name == "__cf_bm" || $0.name == "cf_clearance")
+                ($0.name == "cf_clearance" || $0.name == "__cf_bm")
                     && CloudflareSolver.domainMatches($0.domain, host: host)
             }
             DispatchQueue.main.async {

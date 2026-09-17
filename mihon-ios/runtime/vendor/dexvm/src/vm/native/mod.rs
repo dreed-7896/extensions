@@ -114,14 +114,14 @@ mod kotlinx;
 pub(crate) mod okhttp;
 #[cfg(feature = "okhttp")]
 mod okio;
+#[cfg(feature = "tachiyomi")]
+pub(crate) mod proto;
 #[cfg(feature = "quickjs")]
 mod quickjs;
 #[cfg(feature = "tachiyomi")]
 mod rx;
 #[cfg(feature = "tachiyomi")]
 pub(crate) mod serialization;
-#[cfg(feature = "tachiyomi")]
-pub(crate) mod proto;
 
 #[cfg(feature = "tachiyomi")]
 pub(crate) use self::keiyoushi::*;
@@ -884,6 +884,9 @@ pub(crate) fn inv_virt(
     sig: &str,
     extra: &[JValue],
 ) -> Result<JValue, NatErr> {
+    if recv.is_null_ref() {
+        return Err(npe(vm));
+    }
     let mref = MethodRef {
         name: vm.intern(name),
         sig: vm.intern(sig),
@@ -925,9 +928,12 @@ pub(crate) fn to_string_of(vm: &mut Vm, v: JValue) -> Result<String, NatErr> {
 
 /// java.util.Objects.equals semantics.
 pub(crate) fn java_equals(vm: &mut Vm, a: JValue, b: JValue) -> Result<bool, NatErr> {
+    // DEX `const/4 vX, 0` in a reference slot is null. Kotlin
+    // `Intrinsics.areEqual(null, x)` must not call `equals` on Int(0).
+    if a.is_null_ref() || b.is_null_ref() {
+        return Ok(a.is_null_ref() && b.is_null_ref());
+    }
     let r = match (a, b) {
-        (JValue::Null, JValue::Null) => true,
-        (JValue::Null, _) | (_, JValue::Null) => false,
         (JValue::Int(x), JValue::Int(y)) => x == y,
         (JValue::Long(x), JValue::Long(y)) => x == y,
         (JValue::Float(x), JValue::Float(y)) => x.to_bits() == y.to_bits(),

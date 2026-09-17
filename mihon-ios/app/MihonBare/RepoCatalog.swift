@@ -113,7 +113,13 @@ enum RepoCatalog {
         }
         guard !pkg.isEmpty || !name.isEmpty else { return nil }
         let apk = apkUrl.flatMap { URL(string: $0)?.lastPathComponent } ?? "\(pkg).apk"
-        return RepoExtension(name: name, pkg: pkg, apk: apk, apkUrl: apkUrl, lang: lang)
+        return RepoExtension(
+            name: name,
+            pkg: pkg,
+            apk: apk,
+            apkUrl: apkUrl,
+            lang: lang
+        )
     }
 
     private static func parseResources(_ data: Data) -> String? {

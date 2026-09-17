@@ -47,9 +47,9 @@ fn main() -> ExitCode {
                 let query = args.remove(0);
                 let source = parse_usize(args.first(), 0);
                 let page = parse_i32(args.get(1), 1);
-                engine.search(source, page, &query).map(|(entries, has_next)| {
-                    json!({ "entries": entries, "hasNext": has_next })
-                })
+                engine
+                    .search(source, page, &query)
+                    .map(|(entries, has_next)| json!({ "entries": entries, "hasNext": has_next }))
             }
         }
         "chapters" => {
@@ -86,12 +86,12 @@ fn main() -> ExitCode {
                 engine
                     .image(source, &url, page_url.as_deref())
                     .map(|bytes| {
-                    use base64::Engine as _;
-                    json!({
-                        "bytes": bytes.len(),
-                        "bodyB64": base64::engine::general_purpose::STANDARD.encode(bytes)
+                        use base64::Engine as _;
+                        json!({
+                            "bytes": bytes.len(),
+                            "bodyB64": base64::engine::general_purpose::STANDARD.encode(bytes)
+                        })
                     })
-                })
             }
         }
         other => Err(format!("unknown command {other}")),

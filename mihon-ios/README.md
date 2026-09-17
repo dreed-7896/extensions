@@ -1,16 +1,24 @@
 # MihonBare
 
-On-device Keiyoushi/Mihon APK loader for iOS (LiveContainer).
+On-device Keiyoushi/Mihon APK loader for iOS (LiveContainer). Catalog/install
+matches the public TachiManga model: empty until you install an APK; each
+repo is listed separately so duplicate packages (same `pkg` in Keiyoushi and
+Cursed) are not auto-merged.
 
-Repo URL is hardcoded to the current Keiyoushi protobuf catalog:
+Hardcoded repos (Mihon 0.20 `index.pb`; `index.min.json` is accepted too):
 
-`https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb`
+- Keiyoushi `https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb`
+- Cursed `https://github.com/yuzono/cursed-manga-repo/raw/repo/index.pb`
 
-(`index.json` is two “Outdated App” stubs. Mihon 0.20+ reads `index.pb`.)
+(`index.min.json` on Keiyoushi is two “Outdated App” stubs.)
 
-Cloudflare: same desktop Chrome UA for WKWebView + every request (clearance is UA-bound). Challenge HTML on HTTP 200 is treated as 403 after the overlay, and `cf_clearance` cookies are merged onto the extension Cookie header.
+APKs are Dex-loaded the Mihon way: `tachiyomi.extension.class` → `Source` or
+`SourceFactory`. Cloudflare: same desktop Chrome UA for WKWebView + HTTP.
+After a challenge, fetches retry through that WebView (`fetch()`, same TLS as
+`cf_clearance`) instead of copying cookies onto URLSession.
 
-Page images go through the extension `imageRequest` + OkHttp client (MD@Home tokens, decrypt interceptors). Covers are a plain `GET` with source headers — they are not `Page` objects.
+Page images go through the extension `imageRequest` + OkHttp client (MD@Home
+tokens, decrypt interceptors). Covers are a plain `GET` with source headers.
 
 ## IPA (LiveContainer)
 

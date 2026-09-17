@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct SourceBrowseView: View {
+    let apk: URL
     let apkName: String
-    let pkg: String
     @State private var sources: [SourceInfo] = []
     @State private var error: String?
     @State private var loading = false
@@ -12,7 +12,7 @@ struct SourceBrowseView: View {
             if let error { Text(error).foregroundStyle(.red) }
             ForEach(sources) { src in
                 NavigationLink(src.name + " (\(src.lang))") {
-                    MangaListView(source: src)
+                    MangaListView(apk: apk, source: src)
                 }
             }
         }
@@ -25,6 +25,7 @@ struct SourceBrowseView: View {
         loading = true
         defer { loading = false }
         do {
+            try MihonEngine.shared.ensure(apk: apk)
             sources = try MihonEngine.shared.sources()
         } catch {
             self.error = error.localizedDescription
@@ -40,6 +41,7 @@ private enum BrowseTab: String, CaseIterable, Identifiable {
 }
 
 struct MangaListView: View {
+    let apk: URL
     let source: SourceInfo
     @State private var tab: BrowseTab = .popular
     @State private var items: [MangaEntry] = []
@@ -64,10 +66,10 @@ struct MangaListView: View {
             }
             ForEach(items) { manga in
                 NavigationLink {
-                    ChapterListView(source: source, manga: manga)
+                    ChapterListView(apk: apk, source: source, manga: manga)
                 } label: {
                     HStack {
-                        RemoteImage(source: source.index, url: manga.thumbnail_url)
+                        RemoteImage(apk: apk, source: source.index, url: manga.thumbnail_url)
                             .frame(width: 48, height: 64)
                             .clipped()
                         VStack(alignment: .leading) {
@@ -149,6 +151,7 @@ struct MangaListView: View {
             if reset { loading = false } else { loadingMore = false }
         }
         do {
+            try MihonEngine.shared.ensure(apk: apk)
             let pageToLoad = reset ? 1 : page + 1
             let result: BrowsePayload
             switch tab {
@@ -180,6 +183,7 @@ struct MangaListView: View {
 }
 
 struct ChapterListView: View {
+    let apk: URL
     let source: SourceInfo
     let manga: MangaEntry
     @State private var chapters: [ChapterEntry] = []
@@ -194,7 +198,7 @@ struct ChapterListView: View {
             }
             ForEach(chapters) { ch in
                 NavigationLink(ch.name.isEmpty ? ch.url : ch.name) {
-                    ReaderView(source: source, chapter: ch)
+                    ReaderView(apk: apk, source: source, chapter: ch)
                 }
             }
         }
@@ -208,6 +212,7 @@ struct ChapterListView: View {
         loading = true
         defer { loading = false }
         do {
+            try MihonEngine.shared.ensure(apk: apk)
             chapters = try MihonEngine.shared.chapters(
                 source: source.index,
                 url: manga.url,
@@ -221,6 +226,7 @@ struct ChapterListView: View {
 }
 
 struct ReaderView: View {
+    let apk: URL
     let source: SourceInfo
     let chapter: ChapterEntry
     @State private var pages: [PageEntry] = []
@@ -238,6 +244,7 @@ struct ReaderView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(pages) { page in
                             RemoteImage(
+                                apk: apk,
                                 source: source.index,
                                 url: page.image_url.isEmpty ? page.url : page.image_url,
                                 pageUrl: page.url
@@ -257,6 +264,7 @@ struct ReaderView: View {
         loading = true
         defer { loading = false }
         do {
+            try MihonEngine.shared.ensure(apk: apk)
             pages = try MihonEngine.shared.pages(
                 source: source.index,
                 url: chapter.url,

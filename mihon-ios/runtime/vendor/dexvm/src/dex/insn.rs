@@ -999,7 +999,10 @@ mod tests {
             dec(&[0x20 | (1 << 12), 0x00d], 0),
             Insn::InstanceOf(0, 1, 0x00d)
         );
-        assert_eq!(dec(&[0x1f | (2 << 8), 0x010d], 0), Insn::CheckCast(2, 0x010d));
+        assert_eq!(
+            dec(&[0x1f | (2 << 8), 0x010d], 0),
+            Insn::CheckCast(2, 0x010d)
+        );
     }
 
     #[test]

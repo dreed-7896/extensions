@@ -33,8 +33,7 @@ pub(crate) fn parse_wire(bytes: &[u8]) -> Result<Vec<(u32, WireValue)>, String> 
         }
         let value = match wtype {
             0 => {
-                let (v, n) =
-                    read_varint(bytes, i).ok_or_else(|| "truncated varint".to_string())?;
+                let (v, n) = read_varint(bytes, i).ok_or_else(|| "truncated varint".to_string())?;
                 i += n;
                 WireValue::Varint(v as i64)
             }
@@ -200,9 +199,7 @@ fn dec_cursor(vm: &mut Vm, decoder: JValue) -> Option<&mut usize> {
 fn take_current(vm: &mut Vm, decoder: JValue) -> Option<(u32, WireValue)> {
     match payload_mut(vm, decoder) {
         Some(Native::ProtoDecoder {
-            cur_field,
-            cur_val,
-            ..
+            cur_field, cur_val, ..
         }) => {
             let field = (*cur_field)?;
             let value = cur_val.take()?;
@@ -216,9 +213,7 @@ fn take_current(vm: &mut Vm, decoder: JValue) -> Option<(u32, WireValue)> {
 fn peek_current(vm: &Vm, decoder: JValue) -> Option<(u32, WireValue)> {
     match payload(vm, decoder) {
         Some(Native::ProtoDecoder {
-            cur_field,
-            cur_val,
-            ..
+            cur_field, cur_val, ..
         }) => {
             let field = (*cur_field)?;
             let value = cur_val.clone()?;
@@ -311,9 +306,7 @@ pub(crate) fn p_decode_element_index(vm: &mut Vm, args: &[JValue]) -> PR {
                 // Stash the consumed entry for the element decode call that
                 // immediately follows.
                 if let Some(Native::ProtoDecoder {
-                    cur_field,
-                    cur_val,
-                    ..
+                    cur_field, cur_val, ..
                 }) = payload_mut(vm, args[0])
                 {
                     *cur_field = Some(field_no);
@@ -324,15 +317,11 @@ pub(crate) fn p_decode_element_index(vm: &mut Vm, args: &[JValue]) -> PR {
                         WireValue::Varint(i) => format!("varint({i})"),
                         WireValue::Fixed32(u) => format!("fixed32({u})"),
                         WireValue::Fixed64(b) => format!("fixed64({b})"),
-                        WireValue::Bytes(b) => format!(
-                            "bytes[{}] {:?}",
-                            b.len(),
-                            String::from_utf8_lossy(b)
-                        ),
+                        WireValue::Bytes(b) => {
+                            format!("bytes[{}] {:?}", b.len(), String::from_utf8_lossy(b))
+                        }
                     };
-                    eprintln!(
-                        "PROTO decodeElementIndex field={field_no} -> idx={index} {desc}"
-                    );
+                    eprintln!("PROTO decodeElementIndex field={field_no} -> idx={index} {desc}");
                 }
                 return Ok(JValue::Int(index));
             }
@@ -452,22 +441,14 @@ fn proto_child_decoder(vm: &mut Vm, bytes: Vec<u8>) -> PR {
 
 /// Public entry used by `ArrayListSerializer.deserialize` when the decoder
 /// is a protobuf decoder: consumes the repeated field's consecutive entries.
-pub(crate) fn proto_list_deserialize(
-    vm: &mut Vm,
-    decoder: JValue,
-    child_serializer: JValue,
-) -> PR {
+pub(crate) fn proto_list_deserialize(vm: &mut Vm, decoder: JValue, child_serializer: JValue) -> PR {
     proto_list_deserialize_inner(vm, decoder, child_serializer)
 }
 
 /// Decodes a repeated field: consumes the pending value plus every
 /// consecutive wire entry with the same field number, decoding each through
 /// `child_serializer`, and returns a java.util.ArrayList.
-fn proto_list_deserialize_inner(
-    vm: &mut Vm,
-    decoder: JValue,
-    child_serializer: JValue,
-) -> PR {
+fn proto_list_deserialize_inner(vm: &mut Vm, decoder: JValue, child_serializer: JValue) -> PR {
     let (field_no, first) = peek_current(vm, decoder).ok_or_else(|| npe(vm))?;
 
     let mut items: Vec<WireValue> = vec![first];
@@ -556,7 +537,10 @@ pub(crate) fn p_decode_serializable_element(vm: &mut Vm, args: &[JValue]) -> PR 
 
     // Repeated field driven by ArrayListSerializer: consume all consecutive
     // entries sharing the pending field number.
-    if matches!(payload(vm, serializer), Some(Native::ArrayListSerializer { .. })) {
+    if matches!(
+        payload(vm, serializer),
+        Some(Native::ArrayListSerializer { .. })
+    ) {
         return proto_list_deserialize_inner(vm, args[0], {
             match payload(vm, serializer) {
                 Some(Native::ArrayListSerializer { child }) => *child,
@@ -632,8 +616,7 @@ pub(crate) fn pb_decode_buffered_source_static(vm: &mut Vm, args: &[JValue]) -> 
         )));
     };
 
-    let fields =
-        parse_wire(&data).map_err(|e| iae(vm, format!("invalid protobuf: {e}")))?;
+    let fields = parse_wire(&data).map_err(|e| iae(vm, format!("invalid protobuf: {e}")))?;
     let decoder = alloc(
         vm,
         "Lkotlinx/serialization/protobuf/ProtoDecoder;",

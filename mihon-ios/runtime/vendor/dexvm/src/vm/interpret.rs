@@ -354,7 +354,10 @@ impl Vm {
                                         ri += 1;
                                     }
                                 }
-                                match nf(self, &call_args) {
+                                let prev_ret = self.native_ret.replace((f.class, f.slot, ret_pc));
+                                let result = nf(self, &call_args);
+                                self.native_ret = prev_ret;
+                                match result {
                                     Ok(v) => {
                                         // <init> natives conventionally
                                         // return a freshly allocated object;

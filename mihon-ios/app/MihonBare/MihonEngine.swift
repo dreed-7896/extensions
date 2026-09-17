@@ -6,25 +6,33 @@ final class MihonEngine: @unchecked Sendable {
     static let shared = MihonEngine()
     private let queue = DispatchQueue(label: "mihon.engine")
     private var handle: OpaquePointer?
+    private var openedPath: String?
 
     var isOpen: Bool { queue.sync { handle != nil } }
 
-    func open(apk: URL) throws {
+    func ensure(apk: URL) throws {
         try queue.sync {
+            if openedPath == apk.path, handle != nil { return }
             if let handle {
                 mihon_close(handle)
                 self.handle = nil
             }
+            openedPath = nil
             var err: UnsafeMutablePointer<CChar>?
             let opened = apk.path.withCString { path in
                 mihon_open_file(path, &err)
             }
             if let opened {
                 handle = opened
+                openedPath = apk.path
                 return
             }
             throw MihonError.message(Self.take(err) ?? "failed to open apk")
         }
+    }
+
+    func open(apk: URL) throws {
+        try ensure(apk: apk)
     }
 
     func close() {
@@ -33,6 +41,7 @@ final class MihonEngine: @unchecked Sendable {
                 mihon_close(handle)
                 self.handle = nil
             }
+            openedPath = nil
         }
     }
 

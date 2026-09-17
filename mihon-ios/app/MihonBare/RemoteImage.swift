@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct RemoteImage: View {
+    let apk: URL
     let source: Int
     let url: String
     var pageUrl: String = ""
@@ -28,7 +29,9 @@ struct RemoteImage: View {
         let src = source
         let loc = url
         let page = pageUrl
+        let apkURL = apk
         let data: Data? = await Task.detached {
+            _ = try? MihonEngine.shared.ensure(apk: apkURL)
             if let bytes = try? MihonEngine.shared.image(source: src, url: loc, pageUrl: page),
                !bytes.isEmpty
             {

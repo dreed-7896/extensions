@@ -2196,9 +2196,15 @@ pub static SHIM_CLASSES: &[ShimDef] = &[
         ACC_INTERFACE | ACC_ABSTRACT
     ),
     shim!(
+        "Luy/kohesive/injekt/api/TypeReference;",
+        None,
+        &[],
+        ACC_INTERFACE | ACC_ABSTRACT
+    ),
+    shim!(
         "Luy/kohesive/injekt/api/FullTypeReference;",
         Some("Ljava/lang/Object;"),
-        &[],
+        &["Luy/kohesive/injekt/api/TypeReference;"],
         0
     ),
     // audit gap shim classes (kotlin)

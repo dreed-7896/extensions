@@ -1478,9 +1478,7 @@ pub(crate) fn array_list_serializer_init(vm: &mut Vm, args: &[JValue]) -> R {
 pub(crate) fn array_list_serializer_deserialize(vm: &mut Vm, args: &[JValue]) -> R {
     match payload(vm, args[1]) {
         Some(Native::JsonDecoder {
-            element,
-            module,
-            ..
+            element, module, ..
         }) => run_serializer(vm, args[0], *element, *module),
         // protobuf: consume the repeated field's consecutive wire entries.
         Some(Native::ProtoDecoder { .. }) => {

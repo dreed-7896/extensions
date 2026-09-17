@@ -266,13 +266,7 @@ pub(crate) fn http_source_headers_builder(vm: &mut Vm, _args: &[JValue]) -> R {
 }
 
 fn http_source_call_success(vm: &mut Vm, receiver: JValue, request: JValue) -> R {
-    let client = inv_virt(
-        vm,
-        receiver,
-        "getClient",
-        "()Lokhttp3/OkHttpClient;",
-        &[],
-    )?;
+    let client = inv_virt(vm, receiver, "getClient", "()Lokhttp3/OkHttpClient;", &[])?;
     let call = inv_virt(
         vm,
         client,
@@ -639,9 +633,7 @@ pub(crate) fn http_source_page_list_request(vm: &mut Vm, args: &[JValue]) -> R {
 /// Host default for `imageRequest`: `GET page.imageUrl` with source headers.
 pub(crate) fn http_source_image_request(vm: &mut Vm, args: &[JValue]) -> R {
     let url = match payload(vm, args[1]) {
-        Some(Native::SPPage {
-            image_url, url, ..
-        }) => {
+        Some(Native::SPPage { image_url, url, .. }) => {
             if image_url.is_empty() {
                 url.clone()
             } else {

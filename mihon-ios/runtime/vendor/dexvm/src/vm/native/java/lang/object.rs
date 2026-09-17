@@ -20,9 +20,11 @@ pub(crate) fn object_hash_code(_vm: &mut Vm, args: &[JValue]) -> R {
 }
 
 pub(crate) fn object_equals(_vm: &mut Vm, args: &[JValue]) -> R {
-    let eq = match (args[0], args[1]) {
+    let a = args.first().copied().unwrap_or(JValue::Null);
+    let b = args.get(1).copied().unwrap_or(JValue::Null);
+    let eq = match (a, b) {
+        _ if a.is_null_ref() || b.is_null_ref() => a.is_null_ref() && b.is_null_ref(),
         (JValue::Obj(x), JValue::Obj(y)) => x == y,
-        (JValue::Null, JValue::Null) => true,
         _ => false,
     };
     Ok(JValue::Int(i32::from(eq)))
