@@ -256,7 +256,7 @@ fn jsonval_to_string(v: &JsonVal) -> String {
     }
 }
 
-fn jsonval_to_json(v: &JsonVal) -> String {
+pub(crate) fn jsonval_to_json(v: &JsonVal) -> String {
     fn quoted(value: &str) -> String {
         let mut out = String::with_capacity(value.len() + 2);
         out.push('"');
@@ -423,6 +423,9 @@ fn json_object_builder_put(vm: &mut Vm, args: &[JValue]) -> R {
 }
 
 fn json_builder_put_string(vm: &mut Vm, args: &[JValue]) -> R {
+    if args.get(2).is_some_and(|v| v.is_null_ref()) {
+        return json_builder_put_null(vm, args);
+    }
     let value = jstr(vm, args[2])?;
     let element = alloc_json_node(vm, &JsonVal::Str(value))?;
     json_object_builder_put(vm, &[args[0], args[1], element])?;
@@ -2490,6 +2493,20 @@ fn json_primitive_bool_or_null(vm: &mut Vm, args: &[JValue]) -> R {
     }
 }
 
+/// `JsonElement.toString()` — kotlinx emits compact JSON, not `Class@id`.
+fn json_element_to_string(vm: &mut Vm, args: &[JValue]) -> R {
+    match payload(vm, args[0]) {
+        Some(Native::Json(v)) => Ok(new_str(vm, &jsonval_to_json(v))),
+        _ => {
+            let recv = args[0].as_obj();
+            Ok(new_str(
+                vm,
+                &format!("{}@{:x}", vm.class_desc_str(obj_class(vm, recv)), recv),
+            ))
+        }
+    }
+}
+
 /// `JsonElementKt.JsonPrimitive(Boolean)`.
 fn json_primitive_of_bool(vm: &mut Vm, args: &[JValue]) -> R {
     alloc_json_node(vm, &JsonVal::Bool(bool_of(vm, args[0])))
@@ -2560,6 +2577,12 @@ pub(crate) const SERIALIZATION_TABLE: &[NativeEntry] = &[
         json_object_get
     ),
     ne!("Lkotlinx/serialization/json/JsonObject;", "<init>", "(Ljava/util/Map;)V", true, json_object_init),
+    ne!("Lkotlinx/serialization/json/JsonObject;", "toString", "()Ljava/lang/String;", true, json_element_to_string),
+    ne!("Lkotlinx/serialization/json/JsonArray;", "toString", "()Ljava/lang/String;", true, json_element_to_string),
+    ne!("Lkotlinx/serialization/json/JsonPrimitive;", "toString", "()Ljava/lang/String;", true, json_element_to_string),
+    ne!("Lkotlinx/serialization/json/JsonNull;", "toString", "()Ljava/lang/String;", true, json_element_to_string),
+    ne!("Lkotlinx/serialization/json/JsonElement;", "toString", "()Ljava/lang/String;", true, json_element_to_string),
+    ne!("Lkotlinx/serialization/json/JsonLiteral;", "toString", "()Ljava/lang/String;", true, json_element_to_string),
     ne!("Lkotlinx/serialization/json/JsonObject;", "containsKey", "(Ljava/lang/Object;)Z", true, json_object_contains_key),
     ne!("Lkotlinx/serialization/json/JsonObjectBuilder;", "<init>", "()V", true, json_object_builder_init),
     ne!("Lkotlinx/serialization/json/JsonObjectBuilder;", "build", "()Lkotlinx/serialization/json/JsonObject;", true, json_object_builder_build),

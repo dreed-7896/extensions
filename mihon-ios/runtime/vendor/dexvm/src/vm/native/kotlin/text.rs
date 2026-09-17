@@ -338,6 +338,21 @@ fn stringskt_remove_surrounding(vm: &mut Vm, args: &[JValue]) -> R {
     Ok(new_str(vm, stripped))
 }
 
+fn stringskt_remove_surrounding_pair(vm: &mut Vm, args: &[JValue]) -> R {
+    let value = charseq_of(vm, args[0])?;
+    let prefix = charseq_of(vm, args[1])?;
+    let suffix = charseq_of(vm, args[2])?;
+    let stripped = if value.len() >= prefix.len() + suffix.len()
+        && value.starts_with(&prefix)
+        && value.ends_with(&suffix)
+    {
+        &value[prefix.len()..value.len() - suffix.len()]
+    } else {
+        &value
+    };
+    Ok(new_str(vm, stripped))
+}
+
 fn stringskt_contains(vm: &mut Vm, args: &[JValue]) -> R {
     let haystack = charseq_of(vm, args[0])?;
     let needle = charseq_of(vm, args[1])?;
@@ -1840,10 +1855,19 @@ pub(crate) const KOTLIN_TABLE: &[NativeEntry] = &[
     ne!("Lkotlin/text/StringsKt;", "trim", "(Ljava/lang/String;[C)Ljava/lang/String;", false, stringskt_trim_chars),
     ne!("Lkotlin/text/StringsKt;", "trimEnd", "(Ljava/lang/String;[C)Ljava/lang/String;", false, stringskt_trim_end_chars),
     ne!("Lkotlin/text/StringsKt;", "removeSurrounding", "(Ljava/lang/String;Ljava/lang/CharSequence;)Ljava/lang/String;", false, stringskt_remove_surrounding),
+    ne!("Lkotlin/text/StringsKt;", "removeSurrounding", "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;", false, stringskt_remove_surrounding_pair),
+    ne!("Lkotlin/text/StringsKt;", "removeSurrounding", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;", false, stringskt_remove_surrounding_pair),
     ne!("Lkotlin/text/StringsKt;", "contains", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;Z)Z", false, stringskt_contains),
     ne!("Lkotlin/text/StringsKt;", "startsWith", "(Ljava/lang/String;Ljava/lang/String;Z)Z", false, stringskt_starts_with),
+    ne!("Lkotlin/text/StringsKt;", "startsWith", "(Ljava/lang/String;Ljava/lang/CharSequence;Z)Z", false, stringskt_starts_with),
+    ne!("Lkotlin/text/StringsKt;", "startsWith", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;Z)Z", false, stringskt_starts_with),
+    ne!("Lkotlin/text/StringsKt;", "startsWith$default", "(Ljava/lang/String;Ljava/lang/CharSequence;ZILjava/lang/Object;)Z", false, stringskt_starts_with_default),
+    ne!("Lkotlin/text/StringsKt;", "startsWith$default", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;ZILjava/lang/Object;)Z", false, stringskt_starts_with_default),
     ne!("Lkotlin/text/StringsKt;", "endsWith", "(Ljava/lang/String;Ljava/lang/String;Z)Z", false, stringskt_ends_with),
+    ne!("Lkotlin/text/StringsKt;", "endsWith", "(Ljava/lang/String;Ljava/lang/CharSequence;Z)Z", false, stringskt_ends_with),
+    ne!("Lkotlin/text/StringsKt;", "endsWith", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;Z)Z", false, stringskt_ends_with),
     ne!("Lkotlin/text/StringsKt;", "endsWith$default", "(Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Z", false, stringskt_ends_with_default),
+    ne!("Lkotlin/text/StringsKt;", "endsWith$default", "(Ljava/lang/String;Ljava/lang/CharSequence;ZILjava/lang/Object;)Z", false, stringskt_ends_with_default),
     ne!("Lkotlin/text/StringsKt;", "removePrefix", "(Ljava/lang/String;Ljava/lang/CharSequence;)Ljava/lang/String;", false, stringskt_remove_prefix),
     ne!("Lkotlin/text/StringsKt;", "removeSuffix", "(Ljava/lang/String;Ljava/lang/CharSequence;)Ljava/lang/String;", false, stringskt_remove_suffix),
     ne!("Lkotlin/text/StringsKt;", "substringBefore$default", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;", false, stringskt_substring_before_default),

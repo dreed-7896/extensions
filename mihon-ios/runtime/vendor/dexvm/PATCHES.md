@@ -9,8 +9,7 @@
 - `keiyoushi.rs`: classic request/parse also rejects non-2xx.
 - `vm/native/mod.rs`: `Intrinsics.areEqual` / `inv_virt` treat DEX `Int(0)` as a null
   reference. Hiperdex (and other Madara sources) crashed the IPA on source select.
-- `vm/native/injekt`: `getType`/`getInstance` are matched by method name (not only the
-  base class). `getInstance` peeks the caller's next `check-cast` so
-  `Injekt.get<Json>()` is not allocated as `Application`. Dex `Signature`
-  annotations are parsed as `annotation_set_item` + type_ids (was string_ids +
-  a single annotation_item, so every FullTypeReference looked untyped).
+- `vm/native/kotlin/text.rs`: `StringsKt.removeSurrounding(prefix, suffix)` (NHentai
+  gallery id) plus CharSequence `startsWith`/`endsWith` overloads.
+- `vm/native/serialization.rs`: `JsonElement.toString()` emits compact JSON
+  (Hiperdex tRPC `input=` was `JsonObject@id`). `put(builder, key, null)` is JSON null.
