@@ -1,5 +1,5 @@
 use crate::http;
-use dexvm::keiyoushi::{Chapter, Keiyoushi, Manga, MangaPages, PageRef, Source};
+use dexvm::keiyoushi::{Chapter, Keiyoushi, Manga, PageRef, Source};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -46,9 +46,7 @@ pub struct Engine {
 impl Engine {
     pub fn open_file(path: &str) -> Result<Self, String> {
         let mut ext = Keiyoushi::open(path).map_err(|e| e.to_string())?;
-        ext.ctx()
-            .register_natives(&[crate::extra_shims::EXTRA_NATIVES])
-            .map_err(|e| e.to_string())?;
+        crate::extra_shims::install(ext.ctx().vm())?;
         ext.set_http(http::execute);
         let sources = ext.sources().map_err(|e| ext_err(&mut ext, &e))?;
         if sources.is_empty() {
@@ -68,27 +66,45 @@ impl Engine {
                 supports_latest: self.ext.supports_latest(src).unwrap_or(false),
             });
         }
+        out.sort_by(|a, b| {
+            let rank = |lang: &str| match lang {
+                "all" => 0,
+                "en" => 1,
+                "ja" => 2,
+                _ => 3,
+            };
+            rank(&a.lang)
+                .cmp(&rank(&b.lang))
+                .then_with(|| a.lang.cmp(&b.lang))
+                .then_with(|| a.name.cmp(&b.name))
+        });
         Ok(out)
     }
 
     pub fn popular(&mut self, index: usize, page: i32) -> Result<(Vec<MangaOut>, bool), String> {
         let src = self.src(index)?;
-        let pages = self.try_popular(&src, page)?;
-        Ok((pages.mangas.into_iter().map(manga_out).collect(), pages.has_next))
+        let pages = fallback(
+            &mut self.ext,
+            |ext| ext.popular_coro(&src, page),
+            |ext| ext.popular(&src, page),
+        )?;
+        Ok((
+            pages.mangas.into_iter().map(manga_out).collect(),
+            pages.has_next,
+        ))
     }
 
     pub fn latest(&mut self, index: usize, page: i32) -> Result<(Vec<MangaOut>, bool), String> {
         let src = self.src(index)?;
-        let pages = match self.ext.latest(&src, page) {
-            Ok(p) => p,
-            Err(e) => {
-                let msg = ext_err(&mut self.ext, &e);
-                self.ext
-                    .latest_coro(&src, page)
-                    .map_err(|e2| format!("{msg} / {}", ext_err(&mut self.ext, &e2)))?
-            }
-        };
-        Ok((pages.mangas.into_iter().map(manga_out).collect(), pages.has_next))
+        let pages = fallback(
+            &mut self.ext,
+            |ext| ext.latest_coro(&src, page),
+            |ext| ext.latest(&src, page),
+        )?;
+        Ok((
+            pages.mangas.into_iter().map(manga_out).collect(),
+            pages.has_next,
+        ))
     }
 
     pub fn search(
@@ -98,16 +114,15 @@ impl Engine {
         query: &str,
     ) -> Result<(Vec<MangaOut>, bool), String> {
         let src = self.src(index)?;
-        let pages = match self.ext.search(&src, page, query, &[]) {
-            Ok(p) => p,
-            Err(e) => {
-                let msg = ext_err(&mut self.ext, &e);
-                self.ext
-                    .search_coro(&src, page, query, &[])
-                    .map_err(|e2| format!("{msg} / {}", ext_err(&mut self.ext, &e2)))?
-            }
-        };
-        Ok((pages.mangas.into_iter().map(manga_out).collect(), pages.has_next))
+        let pages = fallback(
+            &mut self.ext,
+            |ext| ext.search_coro(&src, page, query, &[]),
+            |ext| ext.search(&src, page, query, &[]),
+        )?;
+        Ok((
+            pages.mangas.into_iter().map(manga_out).collect(),
+            pages.has_next,
+        ))
     }
 
     pub fn details(&mut self, index: usize, url: &str, title: &str) -> Result<MangaOut, String> {
@@ -129,7 +144,12 @@ impl Engine {
         Ok(manga_out(detailed))
     }
 
-    pub fn chapters(&mut self, index: usize, url: &str, title: &str) -> Result<Vec<ChapterOut>, String> {
+    pub fn chapters(
+        &mut self,
+        index: usize,
+        url: &str,
+        title: &str,
+    ) -> Result<Vec<ChapterOut>, String> {
         let src = self.src(index)?;
         let manga = Manga {
             url: url.to_string(),
@@ -155,15 +175,11 @@ impl Engine {
             name: name.to_string(),
             ..Chapter::default()
         };
-        let list = match self.ext.pages(&src, &chapter) {
-            Ok(p) => p,
-            Err(e) => {
-                let msg = ext_err(&mut self.ext, &e);
-                self.ext
-                    .pages_coro(&src, &chapter)
-                    .map_err(|e2| format!("{msg} / {}", ext_err(&mut self.ext, &e2)))?
-            }
-        };
+        let list = fallback(
+            &mut self.ext,
+            |ext| ext.pages_coro(&src, &chapter),
+            |ext| ext.pages(&src, &chapter),
+        )?;
         Ok(list.into_iter().map(page_out).collect())
     }
 
@@ -173,20 +189,18 @@ impl Engine {
             .copied()
             .ok_or_else(|| format!("source index {index} out of range"))
     }
+}
 
-    fn try_popular(&mut self, src: &Source, page: i32) -> Result<MangaPages, String> {
-        match self.ext.popular(src, page) {
-            Ok(p) if !p.mangas.is_empty() => Ok(p),
-            Ok(p) => match self.ext.popular_coro(src, page) {
-                Ok(c) => Ok(c),
-                Err(_) => Ok(p),
-            },
-            Err(e) => {
-                let msg = ext_err(&mut self.ext, &e);
-                self.ext
-                    .popular_coro(src, page)
-                    .map_err(|e2| format!("{msg} / {}", ext_err(&mut self.ext, &e2)))
-            }
+fn fallback<T>(
+    ext: &mut Keiyoushi,
+    primary: impl FnOnce(&mut Keiyoushi) -> Result<T, dexvm::vm::error::JvmError>,
+    secondary: impl FnOnce(&mut Keiyoushi) -> Result<T, dexvm::vm::error::JvmError>,
+) -> Result<T, String> {
+    match primary(ext) {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            let msg = ext.describe_error(&e);
+            secondary(ext).map_err(|e2| format!("{msg} / {}", ext.describe_error(&e2)))
         }
     }
 }

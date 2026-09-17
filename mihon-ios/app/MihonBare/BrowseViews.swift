@@ -42,6 +42,9 @@ struct MangaListView: View {
     var body: some View {
         List {
             if let error { Text(error).foregroundStyle(.red) }
+            if !loading && error == nil && items.isEmpty {
+                Text("no titles from this source").foregroundStyle(.secondary)
+            }
             ForEach(items) { manga in
                 NavigationLink {
                     ChapterListView(source: source, manga: manga)

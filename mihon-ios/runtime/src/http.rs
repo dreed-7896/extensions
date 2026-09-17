@@ -79,7 +79,9 @@ fn execute_host(cb: HttpCallback, req: &HttpData) -> HttpResp {
             body: None,
         };
     }
-    let text = unsafe { CStr::from_ptr(raw) }.to_string_lossy().into_owned();
+    let text = unsafe { CStr::from_ptr(raw) }
+        .to_string_lossy()
+        .into_owned();
     unsafe { libc_free(raw as *mut c_void) };
     match serde_json::from_str::<WireResp>(&text) {
         Ok(r) => {
@@ -120,37 +122,49 @@ fn agent() -> &'static ureq::Agent {
 }
 
 fn execute_ureq(req: &HttpData) -> HttpResp {
-    let result = if req.method.eq_ignore_ascii_case("POST")
-        || req.method.eq_ignore_ascii_case("PUT")
-    {
-        let mut request = if req.method.eq_ignore_ascii_case("PUT") {
-            agent().put(&req.url)
+    let result =
+        if req.method.eq_ignore_ascii_case("POST") || req.method.eq_ignore_ascii_case("PUT") {
+            let mut request = if req.method.eq_ignore_ascii_case("PUT") {
+                agent().put(&req.url)
+            } else {
+                agent().post(&req.url)
+            };
+            for (k, v) in &req.headers {
+                request = request.header(k, v);
+            }
+            request.send(req.body.as_deref().unwrap_or(""))
         } else {
-            agent().post(&req.url)
+            let mut request = if req.method.eq_ignore_ascii_case("HEAD") {
+                agent().head(&req.url)
+            } else {
+                agent().get(&req.url)
+            };
+            for (k, v) in &req.headers {
+                request = request.header(k, v);
+            }
+            request.call()
         };
-        for (k, v) in &req.headers {
-            request = request.header(k, v);
-        }
-        request.send(req.body.as_deref().unwrap_or(""))
-    } else {
-        let mut request = if req.method.eq_ignore_ascii_case("HEAD") {
-            agent().head(&req.url)
-        } else {
-            agent().get(&req.url)
-        };
-        for (k, v) in &req.headers {
-            request = request.header(k, v);
-        }
-        request.call()
-    };
     match result {
-        Ok(resp) => to_resp(resp),
-        Err(e) => HttpResp {
-            code: 0,
-            message: e.to_string(),
-            headers: Vec::new(),
-            body: None,
-        },
+        Ok(resp) => {
+            let out = to_resp(resp);
+            http_debug(&req.method, &req.url, out.code);
+            out
+        }
+        Err(e) => {
+            http_debug(&req.method, &req.url, 0);
+            HttpResp {
+                code: 0,
+                message: e.to_string(),
+                headers: Vec::new(),
+                body: None,
+            }
+        }
+    }
+}
+
+fn http_debug(method: &str, url: &str, code: i32) {
+    if std::env::var_os("MIHON_HTTP_DEBUG").is_some() {
+        eprintln!("http {method} {code} {url}");
     }
 }
 
