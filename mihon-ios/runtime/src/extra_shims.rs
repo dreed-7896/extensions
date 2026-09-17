@@ -1,4 +1,5 @@
 use dexvm::dex::insn::{decode_all, Insn};
+use dexvm::vm::error::JvmError;
 use dexvm::vm::object::{JsonVal, JsoupDocRef, Native};
 use dexvm::vm::value::JValue;
 use dexvm::vm::{NatErr, NativeEntry, Vm};
@@ -35,7 +36,72 @@ pub fn install(vm: &mut Vm) -> Result<(), String> {
     }
     patch_zone_offset(vm)?;
     patch_json_object(vm)?;
-    patch_localized_string(vm)
+    patch_localized_string(vm)?;
+    patch_android(vm)?;
+    patch_kotlin_instant(vm)
+}
+
+fn patch_android(vm: &mut Vm) -> Result<(), String> {
+    // MangaDex latest reads prefs; many 1.6 sources const-class this.
+    vm.register_native(NativeEntry {
+        class: "Landroid/preference/PreferenceManager;",
+        name: "getDefaultSharedPreferences",
+        sig: "(Landroid/content/Context;)Landroid/content/SharedPreferences;",
+        instance: false,
+        f: pref_manager_default,
+    })
+    .map_err(|e| e.to_string())?;
+
+    // Search path does const-class + sget RELEASE.
+    for desc in ["Landroid/os/Build;", "Landroid/os/Build$VERSION;"] {
+        vm.register_native(NativeEntry {
+            class: desc,
+            name: "mihonPrim",
+            sig: "()V",
+            instance: false,
+            f: noop,
+        })
+        .map_err(|e| e.to_string())?;
+    }
+    let ver = vm
+        .ensure_class_by_desc("Landroid/os/Build$VERSION;")
+        .map_err(|e| e.to_string())?;
+    let release = vm.alloc_string("14");
+    let codename = vm.alloc_string("REL");
+    install_static(vm, ver, "RELEASE", "Ljava/lang/String;", release);
+    install_static(vm, ver, "CODENAME", "Ljava/lang/String;", codename);
+    install_static(vm, ver, "SDK_INT", "I", JValue::Int(34));
+    Ok(())
+}
+
+fn patch_kotlin_instant(vm: &mut Vm) -> Result<(), String> {
+    let instant = vm
+        .ensure_class_by_desc("Lkotlin/time/Instant;")
+        .map_err(|e| e.to_string())?;
+    let companion_cls = vm
+        .ensure_class_by_desc("Lkotlin/time/Instant$Companion;")
+        .map_err(|e| e.to_string())?;
+    let companion = JValue::Obj(
+        vm.alloc_instance(companion_cls)
+            .map_err(|e| e.to_string())?,
+    );
+    install_static(
+        vm,
+        instant,
+        "Companion",
+        "Lkotlin/time/Instant$Companion;",
+        companion,
+    );
+    Ok(())
+}
+
+fn pref_manager_default(vm: &mut Vm, _args: &[JValue]) -> Result<JValue, NatErr> {
+    vm.shared_preferences.entry("default".into()).or_default();
+    alloc(
+        vm,
+        "Landroid/content/SharedPreferences;",
+        Native::SharedPreferences("default".into()),
+    )
 }
 
 fn patch_zone_offset(vm: &mut Vm) -> Result<(), String> {
@@ -407,6 +473,27 @@ pub static EXTRA_NATIVES: &[NativeEntry] = &[
         instance: true,
         f: decode_json_element,
     },
+    NativeEntry {
+        class: "Lkotlinx/coroutines/BuildersKt;",
+        name: "async$default",
+        sig: "(Lkotlinx/coroutines/CoroutineScope;Lkotlin/coroutines/CoroutineContext;Lkotlinx/coroutines/CoroutineStart;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lkotlinx/coroutines/Deferred;",
+        instance: false,
+        f: coroutines_async_default,
+    },
+    NativeEntry {
+        class: "Lkotlin/time/Instant$Companion;",
+        name: "parseOrNull",
+        sig: "(Ljava/lang/CharSequence;)Lkotlin/time/Instant;",
+        instance: true,
+        f: kotlin_instant_parse_or_null,
+    },
+    NativeEntry {
+        class: "Lkotlin/time/Instant$Companion;",
+        name: "parse",
+        sig: "(Ljava/lang/CharSequence;)Lkotlin/time/Instant;",
+        instance: true,
+        f: kotlin_instant_parse_or_null,
+    },
 ];
 
 fn jsoup_parse_stream(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
@@ -439,6 +526,98 @@ fn stream_bytes(vm: &Vm, v: JValue) -> Vec<u8> {
 fn alloc(vm: &mut Vm, desc: &str, native: Native) -> Result<JValue, NatErr> {
     let cid = vm.ensure_class_by_desc(desc).map_err(NatErr::Fatal)?;
     Ok(JValue::Obj(vm.arena.alloc(cid, Vec::new(), Some(native))))
+}
+
+fn jvm_to_nat(e: JvmError) -> NatErr {
+    match e {
+        JvmError::Uncaught(id) => NatErr::Throw(id),
+        other => NatErr::Fatal(other),
+    }
+}
+
+/// dexvm's async$default swallows lambda errors as null, so MangaDex
+/// getMangaUpdate returns SMangaUpdate(manga, null) after a failed chapter parse.
+fn coroutines_async_default(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let scope = args.first().copied().unwrap_or(JValue::Null);
+    let lambda = args.get(3).copied().unwrap_or(JValue::Null);
+    let cont = {
+        let cid = vm
+            .ensure_class_by_desc("Lkotlin/coroutines/jvm/internal/ContinuationImpl;")
+            .map_err(NatErr::Fatal)?;
+        JValue::Obj(vm.alloc_instance(cid).map_err(NatErr::Fatal)?)
+    };
+    let value = vm
+        .invoke_virtual_args(
+            lambda,
+            "invoke",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            vec![scope, cont],
+        )
+        .map_err(jvm_to_nat)?;
+    alloc(
+        vm,
+        "Lkotlinx/coroutines/Deferred;",
+        Native::Deferred {
+            value,
+            error: JValue::Null,
+        },
+    )
+}
+
+fn kotlin_instant_parse_or_null(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let text = match args.get(1).and_then(|v| vm.payload_of(*v)) {
+        Some(Native::Str(s)) => s,
+        _ => return Ok(JValue::Null),
+    };
+    match parse_iso_millis(&text) {
+        Some(ms) => alloc(vm, "Lkotlin/time/Instant;", Native::EpochMillis(ms)),
+        None => Ok(JValue::Null),
+    }
+}
+
+fn parse_iso_millis(text: &str) -> Option<i64> {
+    let s = text.trim();
+    let (date, rest) = s.split_once('T').or_else(|| s.split_once(' '))?;
+    let rest = rest.strip_suffix('Z').unwrap_or(rest);
+    let time = strip_tz_suffix(rest);
+    let mut d = date.split('-');
+    let y: i64 = d.next()?.parse().ok()?;
+    let m: i64 = d.next()?.parse().ok()?;
+    let day: i64 = d.next()?.parse().ok()?;
+    let (clock, frac) = time.split_once('.').map_or((time, ""), |v| v);
+    let mut c = clock.split(':');
+    let h: i64 = c.next()?.parse().ok()?;
+    let min: i64 = c.next()?.parse().ok()?;
+    let sec: i64 = c.next().unwrap_or("0").parse().ok()?;
+    if !(1..=12).contains(&m) || !(1..=31).contains(&day) || h > 23 || min > 59 || sec > 60 {
+        return None;
+    }
+    let adjusted_year = y - i64::from(m <= 2);
+    let era = adjusted_year.div_euclid(400);
+    let year_of_era = adjusted_year - era * 400;
+    let shifted_month = m + if m > 2 { -3 } else { 9 };
+    let day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    let fraction_millis = frac
+        .bytes()
+        .filter(u8::is_ascii_digit)
+        .take(3)
+        .try_fold((0_i64, 0_u8), |(value, digits), byte| {
+            Some((value * 10 + i64::from(byte - b'0'), digits + 1))
+        })
+        .map(|(value, digits)| value * 10_i64.pow(u32::from(3 - digits)))
+        .unwrap_or(0);
+    Some((days * 86_400 + h * 3600 + min * 60 + sec) * 1000 + fraction_millis)
+}
+
+fn strip_tz_suffix(time: &str) -> &str {
+    if let Some(i) = time.rfind(['+', '-']) {
+        if i >= 8 {
+            return &time[..i];
+        }
+    }
+    time
 }
 
 fn now_millis() -> i64 {

@@ -32,18 +32,35 @@ struct SourceBrowseView: View {
     }
 }
 
+private enum BrowseTab: String, CaseIterable, Identifiable {
+    case popular = "Popular"
+    case latest = "Latest"
+    case search = "Search"
+    var id: String { rawValue }
+}
+
 struct MangaListView: View {
     let source: SourceInfo
+    @State private var tab: BrowseTab = .popular
     @State private var items: [MangaEntry] = []
     @State private var query = ""
+    @State private var page = 1
+    @State private var hasNext = false
     @State private var error: String?
     @State private var loading = false
+    @State private var loadingMore = false
+
+    private var tabs: [BrowseTab] {
+        source.supports_latest
+            ? BrowseTab.allCases
+            : BrowseTab.allCases.filter { $0 != .latest }
+    }
 
     var body: some View {
         List {
             if let error { Text(error).foregroundStyle(.red) }
             if !loading && error == nil && items.isEmpty {
-                Text("no titles from this source").foregroundStyle(.secondary)
+                Text(emptyCaption).foregroundStyle(.secondary)
             }
             ForEach(items) { manga in
                 NavigationLink {
@@ -54,40 +71,110 @@ struct MangaListView: View {
                             .frame(width: 48, height: 64)
                             .clipped()
                         VStack(alignment: .leading) {
-                            Text(manga.title).lineLimit(2)
+                            Text(manga.title.isEmpty ? manga.url : manga.title).lineLimit(2)
                             Text(manga.author).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
             }
+            if hasNext {
+                Button {
+                    Task { await loadMore() }
+                } label: {
+                    if loadingMore {
+                        ProgressView()
+                    } else {
+                        Text("Load more")
+                    }
+                }
+            }
         }
-        .searchable(text: $query)
-        .onSubmit(of: .search) { Task { await search() } }
         .navigationTitle(source.name)
+        .safeAreaInset(edge: .top) {
+            VStack(spacing: 8) {
+                Picker("browse", selection: $tab) {
+                    ForEach(tabs) { t in
+                        Text(t.rawValue).tag(t)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if tab == .search {
+                    HStack {
+                        TextField("search this source", text: $query)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .onSubmit { Task { await reload() } }
+                        Button("Go") { Task { await reload() } }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.bar)
+        }
         .overlay { if loading { ProgressView() } }
-        .task { await loadPopular() }
-        .refreshable { await loadPopular() }
-    }
-
-    private func loadPopular() async {
-        loading = true
-        error = nil
-        defer { loading = false }
-        do {
-            items = try MihonEngine.shared.popular(source: source.index, page: 1).entries
-        } catch {
-            self.error = error.localizedDescription
+        .task { await reload() }
+        .refreshable { await reload() }
+        .onChange(of: tab) { _ in
+            Task { await reload() }
         }
     }
 
-    private func search() async {
-        loading = true
+    private var emptyCaption: String {
+        if tab == .search && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "type a query"
+        }
+        return "no titles from this source"
+    }
+
+    private func reload() async {
+        page = 1
+        hasNext = false
+        items = []
         error = nil
-        defer { loading = false }
+        if tab == .search && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return
+        }
+        await fetch(reset: true)
+    }
+
+    private func loadMore() async {
+        guard hasNext, !loading, !loadingMore else { return }
+        await fetch(reset: false)
+    }
+
+    private func fetch(reset: Bool) async {
+        if reset { loading = true } else { loadingMore = true }
+        defer {
+            if reset { loading = false } else { loadingMore = false }
+        }
         do {
-            items = try MihonEngine.shared.search(source: source.index, query: query, page: 1).entries
+            let pageToLoad = reset ? 1 : page + 1
+            let result: BrowsePayload
+            switch tab {
+            case .popular:
+                result = try MihonEngine.shared.popular(source: source.index, page: pageToLoad)
+            case .latest:
+                result = try MihonEngine.shared.latest(source: source.index, page: pageToLoad)
+            case .search:
+                result = try MihonEngine.shared.search(
+                    source: source.index,
+                    query: query,
+                    page: pageToLoad
+                )
+            }
+            if reset {
+                items = result.entries
+            } else {
+                let seen = Set(items.map(\.url))
+                items.append(contentsOf: result.entries.filter { !seen.contains($0.url) })
+            }
+            page = pageToLoad
+            hasNext = result.hasNext
+            error = nil
         } catch {
             self.error = error.localizedDescription
+            if reset { items = [] }
         }
     }
 }
@@ -102,15 +189,19 @@ struct ChapterListView: View {
     var body: some View {
         List {
             if let error { Text(error).foregroundStyle(.red) }
+            if !loading && error == nil && chapters.isEmpty {
+                Text("no chapters from this source").foregroundStyle(.secondary)
+            }
             ForEach(chapters) { ch in
                 NavigationLink(ch.name.isEmpty ? ch.url : ch.name) {
                     ReaderView(source: source, chapter: ch)
                 }
             }
         }
-        .navigationTitle(manga.title)
+        .navigationTitle(manga.title.isEmpty ? manga.url : manga.title)
         .overlay { if loading { ProgressView() } }
         .task { await load() }
+        .refreshable { await load() }
     }
 
     private func load() async {
@@ -122,6 +213,7 @@ struct ChapterListView: View {
                 url: manga.url,
                 title: manga.title
             )
+            error = nil
         } catch {
             self.error = error.localizedDescription
         }
@@ -139,6 +231,8 @@ struct ReaderView: View {
         Group {
             if let error {
                 Text(error).padding()
+            } else if !loading && pages.isEmpty {
+                Text("no pages").padding().foregroundStyle(.secondary)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
