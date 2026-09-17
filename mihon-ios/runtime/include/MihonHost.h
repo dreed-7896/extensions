@@ -14,6 +14,11 @@ typedef char *(*mihon_http_cb)(const char *req_json);
 /// Install URLSession/WKWebView HTTP (call once at app start, before open).
 void mihon_set_http(mihon_http_cb cb);
 
+/// Optional JS eval used by `app.cash.quickjs.QuickJs` (JavaScriptCore on iOS).
+/// `source` -> malloc'd result string (engine `free`s it). NULL = no result.
+typedef char *(*mihon_js_cb)(const char *source);
+void mihon_set_js(mihon_js_cb cb);
+
 /// Load a Mihon/Keiyoushi `.apk`. Caller must `mihon_close`.
 /// On failure returns NULL and writes a malloc'd message to `err` (nullable).
 MihonEngine *mihon_open_file(const char *apk_path, char **err);
@@ -21,7 +26,7 @@ MihonEngine *mihon_open_file(const char *apk_path, char **err);
 void mihon_close(MihonEngine *engine);
 
 /// JSON-RPC against the loaded extension.
-/// `op`: sources | popular | latest | search | details | chapters | pages
+/// `op`: sources | popular | latest | search | details | chapters | pages | image
 /// `args_json`: object, see README.
 /// Returns malloc'd JSON (caller `mihon_string_free`). NULL on error.
 char *mihon_call(MihonEngine *engine, const char *op, const char *args_json, char **err);

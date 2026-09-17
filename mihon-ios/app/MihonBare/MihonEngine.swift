@@ -72,6 +72,18 @@ final class MihonEngine: @unchecked Sendable {
         ).pages
     }
 
+    func image(source: Int, url: String, pageUrl: String = "") throws -> Data {
+        var args: [String: Any] = ["source": source, "url": url]
+        if !pageUrl.isEmpty {
+            args["pageUrl"] = pageUrl
+        }
+        let payload = try decode(ImagePayload.self, op: "image", args: args)
+        guard let data = Data(base64Encoded: payload.bodyB64) else {
+            throw MihonError.message("bad image payload")
+        }
+        return data
+    }
+
     private func decode<T: Decodable>(_ type: T.Type, op: String, args: [String: Any]) throws -> T {
         try queue.sync {
             guard let handle else { throw MihonError.message("no apk loaded") }

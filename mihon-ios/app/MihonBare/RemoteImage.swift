@@ -2,7 +2,9 @@ import SwiftUI
 import UIKit
 
 struct RemoteImage: View {
+    let source: Int
     let url: String
+    var pageUrl: String = ""
     @State private var image: UIImage?
 
     var body: some View {
@@ -13,18 +15,40 @@ struct RemoteImage: View {
                 Color.gray.opacity(0.15)
             }
         }
-        .task(id: url) { await load() }
+        .task(id: "\(source)|\(pageUrl)|\(url)") { await load() }
     }
 
     private func load() async {
-        guard let loc = URL(string: url) else { return }
-        var req = URLRequest(url: loc)
-        if let host = loc.host, CloudflareSolver.hasClearance(for: host) {
-            req.setValue(MihonConfig.safariUA, forHTTPHeaderField: "User-Agent")
+        if url.isEmpty && pageUrl.isEmpty { return }
+        let cacheKey = pageUrl.isEmpty ? url : "\(pageUrl)|\(url)"
+        if let cached = ImageCache.get(cacheKey) {
+            image = cached
+            return
         }
-        if let (data, _) = try? await URLSession.shared.data(for: req),
-           let img = UIImage(data: data) {
-            image = img
-        }
+        let src = source
+        let loc = url
+        let page = pageUrl
+        let data: Data? = await Task.detached {
+            if let bytes = try? MihonEngine.shared.image(source: src, url: loc, pageUrl: page),
+               !bytes.isEmpty
+            {
+                return bytes
+            }
+            guard let u = URL(string: loc), u.scheme == "http" || u.scheme == "https" else {
+                return nil
+            }
+            var req = URLRequest(url: u)
+            req.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+            return try? await URLSession.shared.data(for: req).0
+        }.value
+        guard let data, let img = UIImage(data: data) else { return }
+        ImageCache.set(cacheKey, img)
+        image = img
     }
+}
+
+private enum ImageCache {
+    private static let cache = NSCache<NSString, UIImage>()
+    static func get(_ key: String) -> UIImage? { cache.object(forKey: key as NSString) }
+    static func set(_ key: String, _ image: UIImage) { cache.setObject(image, forKey: key as NSString) }
 }

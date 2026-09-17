@@ -67,7 +67,7 @@ struct MangaListView: View {
                     ChapterListView(source: source, manga: manga)
                 } label: {
                     HStack {
-                        RemoteImage(url: manga.thumbnail_url)
+                        RemoteImage(source: source.index, url: manga.thumbnail_url)
                             .frame(width: 48, height: 64)
                             .clipped()
                         VStack(alignment: .leading) {
@@ -237,8 +237,11 @@ struct ReaderView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(pages) { page in
-                            let raw = page.image_url.isEmpty ? page.url : page.image_url
-                            RemoteImage(url: raw)
+                            RemoteImage(
+                                source: source.index,
+                                url: page.image_url.isEmpty ? page.url : page.image_url,
+                                pageUrl: page.url
+                            )
                         }
                     }
                 }

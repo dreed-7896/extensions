@@ -7,7 +7,7 @@ fn main() -> ExitCode {
     let mut args = env::args().skip(1).collect::<Vec<_>>();
     if args.is_empty() {
         eprintln!(
-            "usage:\n  mihon-host sources <apk>\n  mihon-host popular <apk> [source] [page]\n  mihon-host latest <apk> [source] [page]\n  mihon-host search <apk> <query> [source] [page]\n  mihon-host chapters <apk> <manga-url> [title] [source]\n  mihon-host pages <apk> <chapter-url> [name] [source]"
+            "usage:\n  mihon-host sources <apk>\n  mihon-host popular <apk> [source] [page]\n  mihon-host latest <apk> [source] [page]\n  mihon-host search <apk> <query> [source] [page]\n  mihon-host chapters <apk> <manga-url> [title] [source]\n  mihon-host pages <apk> <chapter-url> [name] [source]\n  mihon-host image <apk> <url> [source] [page-url]"
         );
         return ExitCode::from(2);
     }
@@ -74,6 +74,24 @@ fn main() -> ExitCode {
                 engine
                     .pages(source, &url, &name)
                     .map(|pages| json!({ "pages": pages }))
+            }
+        }
+        "image" => {
+            if args.is_empty() {
+                Err("missing image url".into())
+            } else {
+                let url = args.remove(0);
+                let source = parse_usize(args.first(), 0);
+                let page_url = args.get(1).cloned();
+                engine
+                    .image(source, &url, page_url.as_deref())
+                    .map(|bytes| {
+                    use base64::Engine as _;
+                    json!({
+                        "bytes": bytes.len(),
+                        "bodyB64": base64::engine::general_purpose::STANDARD.encode(bytes)
+                    })
+                })
             }
         }
         other => Err(format!("unknown command {other}")),

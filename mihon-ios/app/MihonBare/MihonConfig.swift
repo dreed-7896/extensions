@@ -2,8 +2,11 @@ import Foundation
 
 enum MihonConfig {
     static let repoIndex = URL(
-        string: "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.json"
+        string: "https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.pb"
     )!
-    static let safariUA =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+    /// Mihon default desktop Chrome UA. Used for both WKWebView CF solves and
+    /// every URLSession request — clearance cookies are bound to this string,
+    /// and mobile HTML breaks desktop CSS selectors in extensions.
+    static let userAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 }

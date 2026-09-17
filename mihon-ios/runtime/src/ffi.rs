@@ -20,6 +20,8 @@ struct Args {
     title: String,
     #[serde(default)]
     name: String,
+    #[serde(default, alias = "pageUrl", alias = "page_url")]
+    page_url: String,
 }
 
 fn one() -> i32 {
@@ -54,6 +56,11 @@ fn to_c_json(v: Value) -> Result<*mut c_char, String> {
 #[no_mangle]
 pub extern "C" fn mihon_set_http(cb: Option<HttpCallback>) {
     http::set_host_http(cb);
+}
+
+#[no_mangle]
+pub extern "C" fn mihon_set_js(cb: Option<crate::extra_shims::JsCallback>) {
+    crate::extra_shims::set_host_js(cb);
 }
 
 #[no_mangle]
@@ -155,6 +162,19 @@ fn dispatch(engine: &mut Engine, op: &str, args: Args) -> Result<Value, String> 
         "pages" => Ok(json!({
             "pages": engine.pages(args.source, &args.url, &args.name)?
         })),
+        "image" => {
+            let page_url = if args.page_url.is_empty() {
+                None
+            } else {
+                Some(args.page_url.as_str())
+            };
+            let bytes = engine.image(args.source, &args.url, page_url)?;
+            let body_b64 = {
+                use base64::Engine as _;
+                base64::engine::general_purpose::STANDARD.encode(bytes)
+            };
+            Ok(json!({ "bodyB64": body_b64 }))
+        }
         other => Err(format!("unknown op '{other}'")),
     }
 }

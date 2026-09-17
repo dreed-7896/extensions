@@ -8,7 +8,7 @@ struct RepoView: View {
 
     var filtered: [RepoExtension] {
         let q = query.lowercased()
-        if q.isEmpty { return Array(extensions.prefix(120)) }
+        if q.isEmpty { return extensions }
         return extensions.filter {
             $0.name.lowercased().contains(q) || $0.pkg.lowercased().contains(q)
         }
@@ -51,13 +51,11 @@ struct RepoView: View {
         defer { loading = false }
         do {
             let (data, _) = try await URLSession.shared.data(from: MihonConfig.repoIndex)
-            if let modern = try? JSONDecoder().decode(NewKeiyoushiIndex.self, from: data),
-               let list = modern.extensionList?.extensions, !list.isEmpty {
-                extensions = list
-            } else if let list = try? JSONDecoder().decode([RepoExtension].self, from: data) {
-                extensions = list
-            } else {
+            let parsed = RepoCatalog.parse(data)
+            if parsed.isEmpty {
                 error = "could not parse index"
+            } else {
+                extensions = parsed
             }
         } catch {
             self.error = error.localizedDescription

@@ -7,9 +7,13 @@ enum CloudflareSolver {
         let cookies = HTTPCookieStorage.shared.cookies ?? []
         return cookies.contains { cookie in
             guard cookie.name == "cf_clearance" else { return false }
-            let domain = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-            return host == domain || host.hasSuffix(".\(domain)") || domain.hasSuffix(host)
+            return domainMatches(cookie.domain, host: host)
         }
+    }
+
+    static func domainMatches(_ cookieDomain: String, host: String) -> Bool {
+        let domain = cookieDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return host == domain || host.hasSuffix(".\(domain)") || domain.hasSuffix(host)
     }
 
     /// Called from the engine thread. Presents a WKWebView on the main thread
@@ -31,7 +35,8 @@ enum CloudflareSolver {
     @MainActor
     private static func solve(urlString: String) async -> Bool {
         guard let url = URL(string: urlString), let host = url.host else { return false }
-        if hasClearance(for: host) { return true }
+        // Always show the WebView when a live request was challenged.
+        // A leftover cf_clearance is often stale (UA / IP bound).
 
         let window = overlayWindow()
         let controller = ChallengeController(url: url)
@@ -94,7 +99,7 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         webView = WKWebView(frame: .zero, configuration: config)
-        webView.customUserAgent = MihonConfig.safariUA
+        webView.customUserAgent = MihonConfig.userAgent
         webView.navigationDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -121,10 +126,32 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
 
     func waitForClearance(host: String) async -> Bool {
         self.host = host
-        webView.load(URLRequest(url: target))
+        seedCookiesThenLoad()
         startPolling()
         return await withCheckedContinuation { cont in
             continuation = cont
+        }
+    }
+
+    private func seedCookiesThenLoad() {
+        let store = webView.configuration.websiteDataStore.httpCookieStore
+        let cookies = HTTPCookieStorage.shared.cookies ?? []
+        guard !cookies.isEmpty else {
+            var req = URLRequest(url: target)
+            req.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+            webView.load(req)
+            return
+        }
+        let group = DispatchGroup()
+        for cookie in cookies {
+            group.enter()
+            store.setCookie(cookie) { group.leave() }
+        }
+        group.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            var req = URLRequest(url: self.target)
+            req.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+            self.webView.load(req)
         }
     }
 
@@ -146,27 +173,28 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
     }
 
     @objc private func finishTapped() {
-        copyCookiesThen { [weak self] ok in
-            self?.complete(ok)
+        copyCookiesThen { [weak self] _ in
+            self?.complete(true)
         }
     }
 
     private func copyCookiesThen(_ done: @escaping (Bool) -> Void) {
         let host = self.host
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+            HTTPCookieStorage.shared.setCookies(
+                cookies,
+                for: URL(string: "https://\(host)/"),
+                mainDocumentURL: URL(string: "https://\(host)/")
+            )
             cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
             let hit = cookies.contains {
-                $0.name == "cf_clearance" && ChallengeController.domainMatches($0.domain, host: host)
+                ($0.name == "cf_clearance" || $0.name == "__cf_bm" || $0.name == "cf_clearance")
+                    && CloudflareSolver.domainMatches($0.domain, host: host)
             }
             DispatchQueue.main.async {
                 done(hit)
             }
         }
-    }
-
-    private static func domainMatches(_ cookieDomain: String, host: String) -> Bool {
-        let domain = cookieDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        return host == domain || host.hasSuffix(".\(domain)") || domain.hasSuffix(host)
     }
 
     private func complete(_ ok: Bool) {

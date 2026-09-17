@@ -4,6 +4,7 @@ import SwiftUI
 struct MihonBareApp: App {
     init() {
         HostHTTP.install()
+        HostJS.install()
     }
 
     var body: some Scene {

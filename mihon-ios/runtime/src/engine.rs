@@ -1,3 +1,4 @@
+use crate::host;
 use crate::http;
 use dexvm::keiyoushi::{Chapter, Keiyoushi, Manga, PageRef, Source};
 use dexvm::vm::error::JvmError;
@@ -7,6 +8,7 @@ use serde::Serialize;
 
 const SMANGA: &str = "Leu/kanade/tachiyomi/source/model/SManga;";
 const CONT: &str = "Lkotlin/coroutines/jvm/internal/ContinuationImpl;";
+const PAGE: &str = "Leu/kanade/tachiyomi/source/model/Page;";
 
 #[derive(Serialize)]
 pub struct SourceInfo {
@@ -15,6 +17,7 @@ pub struct SourceInfo {
     pub name: String,
     pub lang: String,
     pub supports_latest: bool,
+    pub base_url: String,
 }
 
 #[derive(Serialize)]
@@ -54,6 +57,7 @@ impl Engine {
         let mut ext = Keiyoushi::open(path).map_err(|e| e.to_string())?;
         crate::extra_shims::install(ext.ctx().vm())?;
         ext.set_http(http::execute);
+        ext.set_host_headers(|_| (Some(http::USER_AGENT.to_string()), None));
         let sources = ext.sources().map_err(|e| ext.describe_error(&e))?;
         if sources.is_empty() {
             return Err("apk exposed no sources".into());
@@ -70,6 +74,7 @@ impl Engine {
                 name: self.ext.source_name(src).unwrap_or_else(|_| "?".into()),
                 lang: self.ext.source_lang(src).unwrap_or_else(|_| "?".into()),
                 supports_latest: self.ext.supports_latest(src).unwrap_or(false),
+                base_url: self.base_url(src),
             });
         }
         out.sort_by(|a, b| {
@@ -89,26 +94,36 @@ impl Engine {
 
     pub fn popular(&mut self, index: usize, page: i32) -> Result<(Vec<MangaOut>, bool), String> {
         let src = self.src(index)?;
-        let pages = fallback(
+        let base = self.base_url(&src);
+        let pages = mihon_get(
             &mut self.ext,
             |ext| ext.popular_coro(&src, page),
             |ext| ext.popular(&src, page),
         )?;
         Ok((
-            pages.mangas.into_iter().map(manga_out).collect(),
+            pages
+                .mangas
+                .into_iter()
+                .map(|m| manga_out(m, &base))
+                .collect(),
             pages.has_next,
         ))
     }
 
     pub fn latest(&mut self, index: usize, page: i32) -> Result<(Vec<MangaOut>, bool), String> {
         let src = self.src(index)?;
-        let pages = fallback(
+        let base = self.base_url(&src);
+        let pages = mihon_get(
             &mut self.ext,
             |ext| ext.latest_coro(&src, page),
             |ext| ext.latest(&src, page),
         )?;
         Ok((
-            pages.mangas.into_iter().map(manga_out).collect(),
+            pages
+                .mangas
+                .into_iter()
+                .map(|m| manga_out(m, &base))
+                .collect(),
             pages.has_next,
         ))
     }
@@ -120,31 +135,37 @@ impl Engine {
         query: &str,
     ) -> Result<(Vec<MangaOut>, bool), String> {
         let src = self.src(index)?;
-        let pages = fallback(
+        let base = self.base_url(&src);
+        let pages = mihon_get(
             &mut self.ext,
             |ext| ext.search_coro(&src, page, query, &[]),
             |ext| ext.search(&src, page, query, &[]),
         )?;
         Ok((
-            pages.mangas.into_iter().map(manga_out).collect(),
+            pages
+                .mangas
+                .into_iter()
+                .map(|m| manga_out(m, &base))
+                .collect(),
             pages.has_next,
         ))
     }
 
     pub fn details(&mut self, index: usize, url: &str, title: &str) -> Result<MangaOut, String> {
         let src = self.src(index)?;
+        let base = self.base_url(&src);
         let manga = Manga {
             url: url.to_string(),
             title: title.to_string(),
             ..Manga::default()
         };
-        let detailed = try3(
+        let detailed = mihon_get3(
             &mut self.ext,
-            |ext| manga_update_details_host(ext, &src, &manga),
             |ext| details_coro(ext, &src, &manga),
+            |ext| ext.manga_update_details(&src, &manga),
             |ext| ext.manga_details(&src, &manga),
         )?;
-        Ok(manga_out(detailed))
+        Ok(manga_out(detailed, &base))
     }
 
     pub fn chapters(
@@ -159,11 +180,10 @@ impl Engine {
             title: title.to_string(),
             ..Manga::default()
         };
-        // 1.6 (MangaDex) implements getMangaUpdate, not chapterListParse.
-        let list = try3(
+        let list = mihon_get3(
             &mut self.ext,
-            |ext| manga_update_chapters_host(ext, &src, &manga),
             |ext| chapters_coro(ext, &src, &manga),
+            |ext| manga_update_chapters(ext, &src, &manga),
             |ext| ext.chapters(&src, &manga),
         )?;
         Ok(list.into_iter().map(chapter_out).collect())
@@ -171,17 +191,87 @@ impl Engine {
 
     pub fn pages(&mut self, index: usize, url: &str, name: &str) -> Result<Vec<PageOut>, String> {
         let src = self.src(index)?;
+        let base = self.base_url(&src);
         let chapter = Chapter {
             url: url.to_string(),
             name: name.to_string(),
             ..Chapter::default()
         };
-        let list = fallback(
+        let mut list = mihon_get(
             &mut self.ext,
             |ext| ext.pages_coro(&src, &chapter),
             |ext| ext.pages(&src, &chapter),
         )?;
-        Ok(list.into_iter().map(page_out).collect())
+        fill_image_urls(&mut self.ext, &src, &mut list);
+        Ok(list
+            .into_iter()
+            .map(|p| page_out(p, &base))
+            .collect())
+    }
+
+    /// Fetch image bytes through the extension's OkHttpClient (referer,
+    /// decrypt interceptors, cookies) — same path Mihon/TachiManga use.
+    ///
+    /// `page_url` is `Page.url` from `pages()`. Covers pass only `url`
+    /// (thumbnail); that must NOT go through `imageRequest`, because sources
+    /// like MangaDex treat `page.url` as an MD@Home token.
+    pub fn image(
+        &mut self,
+        index: usize,
+        url: &str,
+        page_url: Option<&str>,
+    ) -> Result<Vec<u8>, String> {
+        let src = self.src(index)?;
+        let base = self.base_url(&src);
+        let img = url.trim();
+        let token = page_url.map(str::trim).unwrap_or("");
+        if img.is_empty() && token.is_empty() {
+            return Err("empty image url".into());
+        }
+        if is_page_token(token) {
+            let relative = if img.is_empty() { token } else { img };
+            return run_healed(&mut self.ext, |ext| {
+                image_via_request(ext, &src, token, relative)
+            });
+        }
+        let image = absolutize(&base, if img.is_empty() { token } else { img });
+        if image.is_empty() {
+            return Err("empty image url".into());
+        }
+        let use_page = !token.is_empty() && token != img && token != image;
+        if use_page {
+            match run_healed(&mut self.ext, |ext| {
+                image_via_request(ext, &src, token, &image)
+            }) {
+                Ok(bytes) if !bytes.is_empty() => return Ok(bytes),
+                Err(msg) if fallback_ok(&msg) => {}
+                Ok(_) => {}
+                Err(msg) => return Err(msg),
+            }
+        }
+        match run_healed(&mut self.ext, |ext| image_via_client(ext, &src, &image)) {
+            Ok(bytes) if !bytes.is_empty() => Ok(bytes),
+            Err(msg) if fallback_ok(&msg) => {
+                run_healed(&mut self.ext, |ext| ext.image_data(&src, &image))
+                    .map_err(|m2| format!("{msg} / {m2}"))
+            }
+            Ok(_) => run_healed(&mut self.ext, |ext| ext.image_data(&src, &image)),
+            Err(msg) => Err(msg),
+        }
+    }
+
+    fn base_url(&mut self, src: &Source) -> String {
+        match self
+            .ext
+            .ctx()
+            .invoke_on(src.inst(), "getBaseUrl", "()Ljava/lang/String;", &[])
+        {
+            Ok(v) => match self.ext.ctx().vm().payload_of(v) {
+                Some(Native::Str(s)) => s,
+                _ => String::new(),
+            },
+            Err(_) => String::new(),
+        }
     }
 
     fn src(&self, index: usize) -> Result<Source, String> {
@@ -192,96 +282,168 @@ impl Engine {
     }
 }
 
-fn fallback<T>(
+fn run_healed<T>(
     ext: &mut Keiyoushi,
-    primary: impl FnOnce(&mut Keiyoushi) -> Result<T, JvmError>,
-    secondary: impl FnOnce(&mut Keiyoushi) -> Result<T, JvmError>,
+    mut f: impl FnMut(&mut Keiyoushi) -> Result<T, JvmError>,
 ) -> Result<T, String> {
-    match primary(ext) {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            let msg = ext.describe_error(&e);
-            secondary(ext).map_err(|e2| format!("{msg} / {}", ext.describe_error(&e2)))
-        }
-    }
-}
-
-fn try3<T>(
-    ext: &mut Keiyoushi,
-    a: impl FnOnce(&mut Keiyoushi) -> Result<T, JvmError>,
-    b: impl FnOnce(&mut Keiyoushi) -> Result<T, JvmError>,
-    c: impl FnOnce(&mut Keiyoushi) -> Result<T, JvmError>,
-) -> Result<T, String> {
-    match a(ext) {
-        Ok(v) => Ok(v),
-        Err(e1) => {
-            let m1 = ext.describe_error(&e1);
-            match b(ext) {
-                Ok(v) => Ok(v),
-                Err(e2) => {
-                    let m2 = ext.describe_error(&e2);
-                    c(ext).map_err(|e3| format!("{m1} / {m2} / {}", ext.describe_error(&e3)))
+    let mut last = String::new();
+    for _ in 0..32 {
+        match f(ext) {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                let msg = ext.describe_error(&e);
+                if host::heal(ext.ctx().vm(), &msg) {
+                    last = msg;
+                    continue;
                 }
+                return Err(msg);
             }
         }
     }
+    Err(format!("host heal loop: {last}"))
 }
 
-fn manga_update(
+/// Mihon-style: suspend/coro first (HttpSource default = request/parse),
+/// then classic fetch*/request/parse. Only fall back when the entry point
+/// is missing or deliberately stubbed — not on parse/HTTP failures.
+fn mihon_get<T>(
+    ext: &mut Keiyoushi,
+    primary: impl FnMut(&mut Keiyoushi) -> Result<T, JvmError>,
+    secondary: impl FnMut(&mut Keiyoushi) -> Result<T, JvmError>,
+) -> Result<T, String> {
+    match run_healed(ext, primary) {
+        Ok(v) => Ok(v),
+        Err(msg) if fallback_ok(&msg) => run_healed(ext, secondary).map_err(|m2| format!("{msg} / {m2}")),
+        Err(msg) => Err(msg),
+    }
+}
+
+fn mihon_get3<T>(
+    ext: &mut Keiyoushi,
+    a: impl FnMut(&mut Keiyoushi) -> Result<T, JvmError>,
+    b: impl FnMut(&mut Keiyoushi) -> Result<T, JvmError>,
+    c: impl FnMut(&mut Keiyoushi) -> Result<T, JvmError>,
+) -> Result<T, String> {
+    match mihon_get(ext, a, b) {
+        Ok(v) => Ok(v),
+        Err(msg) if fallback_ok(&msg) => {
+            run_healed(ext, c).map_err(|m3| format!("{msg} / {m3}"))
+        }
+        Err(msg) => Err(msg),
+    }
+}
+
+fn fallback_ok(msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    if m.contains("uncaught")
+        || m.contains("nullpointer")
+        || m.contains("http ")
+        || m.contains("cloudflare")
+        || m.contains("initreader")
+    {
+        return false;
+    }
+    m.contains("resolution error")
+        || m.contains("no method")
+        || m.contains("unsupportedoperation")
+        || m.contains("class not found")
+}
+
+/// Mihon `HttpSource.imageRequest(page)` then the source OkHttp client.
+fn image_via_request(
     ext: &mut Keiyoushi,
     src: &Source,
-    manga: &Manga,
-    fetch_details: bool,
-    fetch_chapters: bool,
-) -> Result<JValue, JvmError> {
-    let m = alloc_manga(ext, manga)?;
-    let empty_list = {
+    page_url: &str,
+    image_url: &str,
+) -> Result<Vec<u8>, JvmError> {
+    let page = {
         let vm = ext.ctx().vm();
-        let cid = vm.ensure_class_by_desc("Ljava/util/ArrayList;")?;
-        JValue::Obj(
-            vm.arena
-                .alloc(cid, Vec::new(), Some(Native::List(Vec::new()))),
-        )
+        let cid = vm.ensure_class_by_desc(PAGE)?;
+        JValue::Obj(vm.arena.alloc(
+            cid,
+            Vec::new(),
+            Some(Native::SPPage {
+                index: 0,
+                name: String::new(),
+                url: page_url.to_string(),
+                image_url: image_url.to_string(),
+            }),
+        ))
     };
-    let cont = suspend_cont(ext)?;
-    ext.ctx().invoke_on(
+    let req = ext.ctx().invoke_on(
         src.inst(),
-        "getMangaUpdate",
-        "(Leu/kanade/tachiyomi/source/model/SManga;Ljava/util/List;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;",
-        &[
-            m,
-            empty_list,
-            JValue::Int(i32::from(fetch_details)),
-            JValue::Int(i32::from(fetch_chapters)),
-            cont,
-        ],
-    )
+        "imageRequest",
+        "(Leu/kanade/tachiyomi/source/model/Page;)Lokhttp3/Request;",
+        &[page],
+    )?;
+    execute_call(ext, src, req)
 }
 
-fn manga_update_chapters_host(
+/// Cover / standalone URL: `GET(url, headers)` on the source client.
+/// Never `imageRequest` — several sources overload that for page tokens.
+fn image_via_client(ext: &mut Keiyoushi, src: &Source, url: &str) -> Result<Vec<u8>, JvmError> {
+    let headers = ext.ctx().invoke_on(
+        src.inst(),
+        "getHeaders",
+        "()Lokhttp3/Headers;",
+        &[],
+    )?;
+    let pairs = match ext.ctx().vm().payload_of(headers) {
+        Some(Native::Headers(h)) => h,
+        _ => Vec::new(),
+    };
+    let req = {
+        let vm = ext.ctx().vm();
+        let cid = vm.ensure_class_by_desc("Lokhttp3/Request;")?;
+        JValue::Obj(vm.arena.alloc(
+            cid,
+            Vec::new(),
+            Some(Native::Request {
+                url: url.to_string(),
+                method: "GET".into(),
+                headers: pairs,
+                body: None,
+            }),
+        ))
+    };
+    execute_call(ext, src, req)
+}
+
+fn execute_call(ext: &mut Keiyoushi, src: &Source, req: JValue) -> Result<Vec<u8>, JvmError> {
+    let client = ext
+        .ctx()
+        .invoke_on(src.inst(), "getClient", "()Lokhttp3/OkHttpClient;", &[])?;
+    let call = ext.ctx().invoke_on(
+        client.as_obj(),
+        "newCall",
+        "(Lokhttp3/Request;)Lokhttp3/Call;",
+        &[req],
+    )?;
+    let resp = ext
+        .ctx()
+        .invoke_on(call.as_obj(), "execute", "()Lokhttp3/Response;", &[])?;
+    match ext.ctx().vm().payload_of(resp) {
+        Some(Native::Response {
+            body: Some(b),
+            code,
+            ..
+        }) if (200..300).contains(&code) => Ok(b),
+        Some(Native::Response { code, .. }) => Err(JvmError::Resolution(format!("HTTP {code}"))),
+        _ => Err(JvmError::Resolution(
+            "image request did not yield a Response".into(),
+        )),
+    }
+}
+
+fn manga_update_chapters(
     ext: &mut Keiyoushi,
     src: &Source,
     manga: &Manga,
 ) -> Result<Vec<Chapter>, JvmError> {
-    let out = manga_update(ext, src, manga, false, true)?;
+    let out = ext.manga_update_coro(src, manga, false, true)?;
     read_chapters(ext, out)
 }
 
-fn manga_update_details_host(
-    ext: &mut Keiyoushi,
-    src: &Source,
-    manga: &Manga,
-) -> Result<Manga, JvmError> {
-    let out = manga_update(ext, src, manga, true, false)?;
-    read_manga_value(ext, out)?.ok_or_else(|| {
-        JvmError::Resolution(format!(
-            "getMangaUpdate: not a SManga ({})",
-            payload_kind(ext, out)
-        ))
-    })
-}
-
-/// 1.6 sources override suspend `getChapterList` and stub `chapterListParse`.
 fn chapters_coro(
     ext: &mut Keiyoushi,
     src: &Source,
@@ -298,7 +460,6 @@ fn chapters_coro(
     read_chapters(ext, out)
 }
 
-/// 1.6 sources override suspend `getMangaDetails`.
 fn details_coro(ext: &mut Keiyoushi, src: &Source, manga: &Manga) -> Result<Manga, JvmError> {
     let m = alloc_manga(ext, manga)?;
     let cont = suspend_cont(ext)?;
@@ -314,6 +475,55 @@ fn details_coro(ext: &mut Keiyoushi, src: &Source, manga: &Manga) -> Result<Mang
             payload_kind(ext, out)
         ))
     })
+}
+
+fn fill_image_urls(ext: &mut Keiyoushi, src: &Source, pages: &mut [PageRef]) {
+    for page in pages.iter_mut() {
+        // Mihon HttpPageLoader: getImageUrl only when imageUrl is empty.
+        if !page.image_url.is_empty() {
+            continue;
+        }
+        match resolve_image_url(ext, src, page) {
+            Ok(url) if !url.is_empty() => page.image_url = url,
+            _ => {
+                if page.image_url.is_empty() {
+                    page.image_url = page.url.clone();
+                }
+            }
+        }
+    }
+}
+
+fn resolve_image_url(
+    ext: &mut Keiyoushi,
+    src: &Source,
+    page: &PageRef,
+) -> Result<String, JvmError> {
+    let obj = {
+        let vm = ext.ctx().vm();
+        let cid = vm.ensure_class_by_desc(PAGE)?;
+        JValue::Obj(vm.arena.alloc(
+            cid,
+            Vec::new(),
+            Some(Native::SPPage {
+                index: page.index,
+                name: page.name.clone(),
+                url: page.url.clone(),
+                image_url: page.image_url.clone(),
+            }),
+        ))
+    };
+    let cont = suspend_cont(ext)?;
+    let out = ext.ctx().invoke_on(
+        src.inst(),
+        "getImageUrl",
+        "(Leu/kanade/tachiyomi/source/model/Page;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;",
+        &[obj, cont],
+    )?;
+    match ext.ctx().vm().payload_of(out) {
+        Some(Native::Str(s)) => Ok(s),
+        _ => Ok(String::new()),
+    }
 }
 
 fn alloc_manga(ext: &mut Keiyoushi, m: &Manga) -> Result<JValue, JvmError> {
@@ -456,11 +666,57 @@ fn class_of(vm: &dexvm::Vm, v: JValue) -> String {
     format!("{v:?}")
 }
 
-fn manga_out(m: Manga) -> MangaOut {
+fn is_absolute_url(url: &str) -> bool {
+    url.starts_with("http://") || url.starts_with("https://") || url.starts_with("data:")
+}
+
+/// Page.url used as a token bag (MD@Home: `host,tokenUrl,ts`) rather than a
+/// fetchable image URL. Keep image_url relative so imageRequest can join it.
+fn is_page_token(url: &str) -> bool {
+    let mut parts = url.split(',');
+    let host = parts.next().unwrap_or("");
+    parts.next().is_some() && (host.starts_with("http://") || host.starts_with("https://"))
+}
+
+fn absolutize(base: &str, url: &str) -> String {
+    let url = url.trim();
+    if url.is_empty() {
+        return String::new();
+    }
+    if is_absolute_url(url) {
+        return url.to_string();
+    }
+    if url.starts_with("//") {
+        return format!("https:{url}");
+    }
+    let Some(origin) = origin_of(base) else {
+        return url.to_string();
+    };
+    if url.starts_with('/') {
+        return format!("{origin}{url}");
+    }
+    let prefix = base.rsplit_once('/').map(|(a, _)| a).unwrap_or(base);
+    format!("{prefix}/{url}")
+}
+
+fn origin_of(base: &str) -> Option<String> {
+    let scheme = if base.starts_with("https://") {
+        "https"
+    } else if base.starts_with("http://") {
+        "http"
+    } else {
+        return None;
+    };
+    let rest = base.split("://").nth(1)?;
+    let host = rest.split('/').next()?;
+    Some(format!("{scheme}://{host}"))
+}
+
+fn manga_out(m: Manga, base: &str) -> MangaOut {
     MangaOut {
         title: m.title,
         url: m.url,
-        thumbnail_url: m.thumbnail_url,
+        thumbnail_url: absolutize(base, &m.thumbnail_url),
         author: m.author,
         artist: m.artist,
         description: m.description,
@@ -478,10 +734,20 @@ fn chapter_out(c: Chapter) -> ChapterOut {
     }
 }
 
-fn page_out(p: PageRef) -> PageOut {
+fn page_out(p: PageRef, base: &str) -> PageOut {
+    let image = if p.image_url.is_empty() {
+        p.url.clone()
+    } else {
+        p.image_url
+    };
+    let image_url = if is_absolute_url(&image) || is_page_token(&p.url) {
+        image
+    } else {
+        absolutize(base, &image)
+    };
     PageOut {
         index: p.index,
         url: p.url,
-        image_url: p.image_url,
+        image_url,
     }
 }

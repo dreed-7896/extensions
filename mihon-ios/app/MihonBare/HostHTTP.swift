@@ -9,6 +9,9 @@ enum HostHTTP {
         config.httpCookieAcceptPolicy = .always
         config.timeoutIntervalForRequest = 30
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        if #available(iOS 13.0, *) {
+            config.tlsMinimumSupportedProtocolVersion = .TLSv12
+        }
         return URLSession(configuration: config)
     }()
 
@@ -27,8 +30,19 @@ enum HostHTTP {
         }
 
         var result = fetch(req, url: url)
-        if isCloudflare(result), CloudflareSolver.solveBlocking(urlString: req.url) {
-            result = fetch(req, url: url)
+        if isCloudflare(result) {
+            let solved = CloudflareSolver.solveBlocking(urlString: req.url)
+            if solved {
+                result = fetch(req, url: url)
+                if isCloudflare(result) {
+                    Thread.sleep(forTimeInterval: 0.4)
+                    result = fetch(req, url: url)
+                }
+            }
+            if isCloudflare(result) {
+                result.code = 403
+                result.message = "cloudflare challenge"
+            }
         }
         return strdupJson(result)
     }
@@ -39,9 +53,8 @@ enum HostHTTP {
         for (k, v) in req.headers {
             request.setValue(v, forHTTPHeaderField: k)
         }
-        if let host = url.host, CloudflareSolver.hasClearance(for: host) {
-            request.setValue(MihonConfig.safariUA, forHTTPHeaderField: "User-Agent")
-        }
+        request.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+        applyCookies(&request, url: url)
         if let body = req.body {
             request.httpBody = Data(body.utf8)
         }
@@ -69,19 +82,65 @@ enum HostHTTP {
         return out
     }
 
+    /// Merge URLSession cookies on top of any Cookie header the extension set.
+    /// Last-wins per name so `cf_clearance` from WKWebView replaces a stale jar.
+    private static func applyCookies(_ request: inout URLRequest, url: URL) {
+        var parts: [(String, String)] = []
+        let put = { (raw: String) in
+            for item in raw.split(separator: ";") {
+                let p = item.trimmingCharacters(in: .whitespaces)
+                guard let eq = p.firstIndex(of: "=") else { continue }
+                let name = String(p[..<eq])
+                let value = String(p[p.index(after: eq)...])
+                if let i = parts.firstIndex(where: { $0.0.caseInsensitiveCompare(name) == .orderedSame }) {
+                    parts[i] = (name, value)
+                } else {
+                    parts.append((name, value))
+                }
+            }
+        }
+        if let existing = request.value(forHTTPHeaderField: "Cookie") {
+            put(existing)
+        }
+        if let cookies = HTTPCookieStorage.shared.cookies(for: url), !cookies.isEmpty {
+            put(cookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; "))
+        }
+        if parts.isEmpty { return }
+        request.setValue(
+            parts.map { "\($0.0)=\($0.1)" }.joined(separator: "; "),
+            forHTTPHeaderField: "Cookie"
+        )
+    }
+
     private static func isCloudflare(_ r: EngineResp) -> Bool {
-        guard r.code == 403 || r.code == 503 else { return false }
-        let headers = Dictionary(uniqueKeysWithValues: r.headers.map { ($0.0.lowercased(), $0.1) })
+        let headers = Dictionary(
+            r.headers.map { ($0.0.lowercased(), $0.1) },
+            uniquingKeysWith: { _, last in last }
+        )
         if (headers["cf-mitigated"] ?? "").lowercased() == "challenge" { return true }
         let server = (headers["server"] ?? "").lowercased()
-        let body = Data(base64Encoded: r.bodyB64).flatMap { String(data: $0.prefix(8000), encoding: .utf8) }?
+        let body = Data(base64Encoded: r.bodyB64).flatMap { String(data: $0.prefix(16000), encoding: .utf8) }?
             .lowercased() ?? ""
-        if server.contains("cloudflare") { return true }
-        return body.contains("just a moment")
+        let challenged = body.contains("just a moment")
             || body.contains("challenge-platform")
             || body.contains("cf-chl")
             || body.contains("_cf_chl")
             || body.contains("enable javascript and cookies to continue")
+            || body.contains("attention required")
+            || body.contains("ddos-guard")
+            || body.contains("checking your browser")
+            || body.contains("verify you are human")
+            || body.contains("cf-turnstile")
+            || body.contains("turnstile")
+            || body.contains("cdn-cgi/challenge")
+            || body.contains("challenge-error-title")
+            || body.contains("cf-browser-verification")
+            || body.contains("managed challenge")
+        if challenged { return true }
+        if r.code == 403 || r.code == 503 || r.code == 429 {
+            return server.contains("cloudflare") || body.contains("cloudflare")
+        }
+        return false
     }
 
     private static func fail(_ code: Int, _ message: String) -> EngineResp {

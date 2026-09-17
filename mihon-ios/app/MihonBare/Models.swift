@@ -8,6 +8,14 @@ struct RepoExtension: Identifiable, Decodable {
     let apkUrl: String?
     let lang: String?
 
+    init(name: String, pkg: String, apk: String, apkUrl: String?, lang: String?) {
+        self.name = name
+        self.pkg = pkg
+        self.apk = apk
+        self.apkUrl = apkUrl
+        self.lang = lang
+    }
+
     private enum CodingKeys: String, CodingKey {
         case name, pkg, apk, lang, packageName, resources, sources
     }
@@ -50,6 +58,20 @@ struct SourceInfo: Identifiable, Decodable {
     let name: String
     let lang: String
     let supports_latest: Bool
+    let base_url: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case index, name, lang, supports_latest, base_url
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        index = try c.decode(Int.self, forKey: .index)
+        name = try c.decode(String.self, forKey: .name)
+        lang = try c.decode(String.self, forKey: .lang)
+        supports_latest = try c.decode(Bool.self, forKey: .supports_latest)
+        base_url = try c.decodeIfPresent(String.self, forKey: .base_url)
+    }
 }
 
 struct MangaEntry: Identifiable, Decodable, Hashable {
@@ -86,6 +108,7 @@ struct BrowsePayload: Decodable {
 }
 struct ChaptersPayload: Decodable { let chapters: [ChapterEntry] }
 struct PagesPayload: Decodable { let pages: [PageEntry] }
+struct ImagePayload: Decodable { let bodyB64: String }
 
 struct NewKeiyoushiIndex: Decodable {
     struct List: Decodable { let extensions: [RepoExtension] }

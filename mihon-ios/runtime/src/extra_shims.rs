@@ -1,8 +1,11 @@
 use dexvm::dex::insn::{decode_all, Insn};
 use dexvm::vm::error::JvmError;
-use dexvm::vm::object::{JsonVal, JsoupDocRef, Native};
+use dexvm::vm::object::{ArrayData, JsonVal, JsoupDocRef, Native};
 use dexvm::vm::value::JValue;
-use dexvm::vm::{NatErr, NativeEntry, Vm};
+use dexvm::vm::{NatErr, NativeEntry, NativeFn, Vm};
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_void};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DAY_MS: i64 = 86_400_000;
@@ -38,7 +41,9 @@ pub fn install(vm: &mut Vm) -> Result<(), String> {
     patch_json_object(vm)?;
     patch_localized_string(vm)?;
     patch_android(vm)?;
-    patch_kotlin_instant(vm)
+    patch_kotlin_instant(vm)?;
+    register_json_decoders(vm)?;
+    crate::host::install(vm)
 }
 
 fn patch_android(vm: &mut Vm) -> Result<(), String> {
@@ -122,7 +127,7 @@ fn patch_zone_offset(vm: &mut Vm) -> Result<(), String> {
     Ok(())
 }
 
-fn install_static(vm: &mut Vm, class: u32, name: &str, ty: &str, value: JValue) {
+pub(crate) fn install_static(vm: &mut Vm, class: u32, name: &str, ty: &str, value: JValue) {
     let name = vm.intern(name);
     let ty = vm.intern(ty);
     let cl = &mut vm.classes[class as usize];
@@ -494,7 +499,161 @@ pub static EXTRA_NATIVES: &[NativeEntry] = &[
         instance: true,
         f: kotlin_instant_parse_or_null,
     },
+    NativeEntry {
+        class: "Lapp/cash/quickjs/QuickJs;",
+        name: "create",
+        sig: "()Lapp/cash/quickjs/QuickJs;",
+        instance: false,
+        f: quickjs_create,
+    },
+    NativeEntry {
+        class: "Lapp/cash/quickjs/QuickJs;",
+        name: "evaluate",
+        sig: "(Ljava/lang/String;)Ljava/lang/Object;",
+        instance: true,
+        f: quickjs_evaluate,
+    },
+    NativeEntry {
+        class: "Lapp/cash/quickjs/QuickJs;",
+        name: "close",
+        sig: "()V",
+        instance: true,
+        f: noop,
+    },
+    NativeEntry {
+        class: "Lapp/cash/quickjs/QuickJs;",
+        name: "compile",
+        sig: "(Ljava/lang/String;Ljava/lang/String;)[B",
+        instance: true,
+        f: quickjs_compile,
+    },
+    NativeEntry {
+        class: "Lapp/cash/quickjs/QuickJs;",
+        name: "execute",
+        sig: "([B)Ljava/lang/Object;",
+        instance: true,
+        f: quickjs_execute,
+    },
+    NativeEntry {
+        class: "Ljava/lang/System;",
+        name: "getProperty",
+        sig: "(Ljava/lang/String;)Ljava/lang/String;",
+        instance: false,
+        f: sys_get_property,
+    },
+    NativeEntry {
+        class: "Ljava/lang/System;",
+        name: "getProperty",
+        sig: "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        instance: false,
+        f: sys_get_property,
+    },
+    NativeEntry {
+        class: "Ljava/lang/StringBuilder;",
+        name: "append",
+        sig: "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+        instance: true,
+        f: sb_append_str,
+    },
+    NativeEntry {
+        class: "Ljava/lang/StringBuilder;",
+        name: "append",
+        sig: "(Ljava/lang/CharSequence;)Ljava/lang/StringBuilder;",
+        instance: true,
+        f: sb_append_str,
+    },
+    NativeEntry {
+        class: "Leu/kanade/tachiyomi/source/model/SManga;",
+        name: "getThumbnailUrl",
+        sig: "()Ljava/lang/String;",
+        instance: true,
+        f: smanga_get_thumbnail,
+    },
+    NativeEntry {
+        class: "Leu/kanade/tachiyomi/source/model/SManga;",
+        name: "setThumbnailUrl",
+        sig: "(Ljava/lang/String;)V",
+        instance: true,
+        f: smanga_set_thumbnail,
+    },
 ];
+
+const JSON_DECODERS: &[&str] = &[
+    "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+    "Lkotlinx/serialization/json/JsonDecoder;",
+    "Lkotlinx/serialization/encoding/CompositeDecoder;",
+    "Lkotlinx/serialization/encoding/Decoder;",
+];
+
+fn register_json_decoders(vm: &mut Vm) -> Result<(), String> {
+    let methods: &[(&str, &str, NativeFn)] = &[
+        (
+            "decodeDoubleElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)D",
+            decode_double_element,
+        ),
+        (
+            "decodeDoubleElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;)D",
+            decode_double_element,
+        ),
+        (
+            "decodeFloatElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)F",
+            decode_float_element,
+        ),
+        (
+            "decodeFloatElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;)F",
+            decode_float_element,
+        ),
+        (
+            "decodeByteElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)B",
+            decode_int_element,
+        ),
+        (
+            "decodeShortElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)S",
+            decode_int_element,
+        ),
+        (
+            "decodeCharElement",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)C",
+            decode_int_element,
+        ),
+        ("decodeDouble", "()D", decode_double_value),
+        ("decodeFloat", "()F", decode_float_value),
+        ("decodeByte", "()B", decode_int_value),
+        ("decodeShort", "()S", decode_int_value),
+        ("decodeChar", "()C", decode_int_value),
+        ("decodeNotNullMark", "()Z", decode_not_null_mark),
+        ("decodeNull", "()Ljava/lang/Void;", decode_null_value),
+        (
+            "decodeEnum",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;)I",
+            decode_int_value,
+        ),
+        (
+            "decodeInline",
+            "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlinx/serialization/encoding/Decoder;",
+            decode_inline,
+        ),
+    ];
+    for class in JSON_DECODERS {
+        for &(name, sig, f) in methods {
+            vm.register_native(NativeEntry {
+                class,
+                name,
+                sig,
+                instance: true,
+                f,
+            })
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
 
 fn jsoup_parse_stream(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
     let bytes = stream_bytes(vm, args.first().copied().unwrap_or(JValue::Null));
@@ -868,4 +1027,316 @@ fn civil_utc(millis: i64) -> (i32, u32, u32, u32, u32, u32) {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     (y as i32, m, d, hour, minute, second)
+}
+
+fn decoder_json(vm: &Vm, decoder: JValue) -> Option<JsonVal> {
+    let element = match vm.payload_of(decoder) {
+        Some(Native::JsonDecoder { element, .. }) => element,
+        Some(Native::Json(_)) => decoder,
+        _ => return None,
+    };
+    match vm.payload_of(element) {
+        Some(Native::Json(v)) => Some(v),
+        _ => None,
+    }
+}
+
+fn json_as_f64(v: &JsonVal) -> f64 {
+    match v {
+        JsonVal::Double(d) => *d,
+        JsonVal::Int(i) => *i as f64,
+        JsonVal::Bool(b) => {
+            if *b {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        JsonVal::Str(s) => s.parse().unwrap_or(0.0),
+        _ => 0.0,
+    }
+}
+
+fn member_json(vm: &Vm, args: &[JValue]) -> JsonVal {
+    let decoder = args.first().copied().unwrap_or(JValue::Null);
+    let Some(root) = decoder_json(vm, decoder) else {
+        return JsonVal::Null;
+    };
+    if args.len() < 3 {
+        return root;
+    }
+    let index = match args.get(2).copied().unwrap_or(JValue::Int(0)) {
+        JValue::Int(i) => i,
+        JValue::Long(l) => l as i32,
+        _ => 0,
+    };
+    if let Some(Native::SerialDescriptor { elements, .. }) =
+        args.get(1).and_then(|d| vm.payload_of(*d))
+    {
+        if let Some(name) = elements.get(index as usize) {
+            if let JsonVal::Object(entries) = &root {
+                if let Some((_, v)) = entries.iter().find(|(k, _)| k == name) {
+                    return v.clone();
+                }
+            }
+        }
+    }
+    match root {
+        JsonVal::Object(entries) => entries
+            .get(index as usize)
+            .map(|(_, v)| v.clone())
+            .unwrap_or(JsonVal::Null),
+        JsonVal::Array(items) => items
+            .get(index as usize)
+            .cloned()
+            .unwrap_or(JsonVal::Null),
+        other => other,
+    }
+}
+
+fn decode_double_element(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    Ok(JValue::Double(json_as_f64(&member_json(vm, args))))
+}
+
+fn decode_float_element(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    Ok(JValue::Float(json_as_f64(&member_json(vm, args)) as f32))
+}
+
+fn decode_int_element(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    Ok(JValue::Int(json_as_f64(&member_json(vm, args)) as i32))
+}
+
+fn decode_double_value(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null))
+        .unwrap_or(JsonVal::Null);
+    Ok(JValue::Double(json_as_f64(&v)))
+}
+
+fn decode_float_value(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null))
+        .unwrap_or(JsonVal::Null);
+    Ok(JValue::Float(json_as_f64(&v) as f32))
+}
+
+fn decode_int_value(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null))
+        .unwrap_or(JsonVal::Null);
+    Ok(JValue::Int(json_as_f64(&v) as i32))
+}
+
+fn decode_not_null_mark(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let v = decoder_json(vm, args.first().copied().unwrap_or(JValue::Null));
+    Ok(JValue::Int(i32::from(!matches!(v, Some(JsonVal::Null) | None))))
+}
+
+fn decode_null_value(_vm: &mut Vm, _args: &[JValue]) -> Result<JValue, NatErr> {
+    Ok(JValue::Null)
+}
+
+fn decode_inline(_vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    Ok(args.first().copied().unwrap_or(JValue::Null))
+}
+
+pub type JsCallback = unsafe extern "C" fn(*const c_char) -> *mut c_char;
+
+static HOST_JS: Mutex<Option<JsCallback>> = Mutex::new(None);
+
+pub fn set_host_js(cb: Option<JsCallback>) {
+    *HOST_JS.lock().expect("js cb lock") = cb;
+}
+
+fn call_host_js(src: &str) -> Option<String> {
+    let cb = (*HOST_JS.lock().ok()?)?;
+    let cstr = CString::new(src.replace('\0', "")).ok()?;
+    let raw = unsafe { cb(cstr.as_ptr()) };
+    if raw.is_null() {
+        return None;
+    }
+    let text = unsafe { CStr::from_ptr(raw) }
+        .to_string_lossy()
+        .into_owned();
+    unsafe { js_free(raw as *mut c_void) };
+    Some(text)
+}
+
+extern "C" {
+    fn free(ptr: *mut c_void);
+}
+
+unsafe fn js_free(ptr: *mut c_void) {
+    if !ptr.is_null() {
+        free(ptr);
+    }
+}
+
+fn extract_json_literal(src: &str) -> Option<String> {
+    for (open, close) in [('[' as u8, ']' as u8), ('{' as u8, '}' as u8)] {
+        let bytes = src.as_bytes();
+        let start = bytes.iter().position(|&b| b == open)?;
+        let end = bytes.iter().rposition(|&b| b == close)?;
+        if end <= start {
+            continue;
+        }
+        let slice = src.get(start..=end)?;
+        if serde_json::from_str::<serde_json::Value>(slice).is_ok() {
+            return Some(slice.to_string());
+        }
+    }
+    None
+}
+
+fn eval_js_source(vm: &mut Vm, src: &str) -> Result<JValue, NatErr> {
+    if let Some(out) = call_host_js(src) {
+        return js_text_to_jvalue(vm, &out);
+    }
+    if let Some(lit) = extract_json_literal(src) {
+        return js_text_to_jvalue(vm, &lit);
+    }
+    let trimmed = src.trim().trim_end_matches(';');
+    if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+        return js_text_to_jvalue(vm, trimmed);
+    }
+    Ok(JValue::Null)
+}
+
+fn js_text_to_jvalue(vm: &mut Vm, text: &str) -> Result<JValue, NatErr> {
+    let t = text.trim();
+    if t.is_empty() || t == "undefined" || t == "null" {
+        return Ok(JValue::Null);
+    }
+    if t == "true" {
+        return Ok(JValue::Int(1));
+    }
+    if t == "false" {
+        return Ok(JValue::Int(0));
+    }
+    if let Ok(n) = t.parse::<i64>() {
+        return Ok(JValue::Long(n));
+    }
+    if (t.starts_with('[') || t.starts_with('{'))
+        && serde_json::from_str::<serde_json::Value>(t).is_ok()
+    {
+        return Ok(vm.alloc_string(t));
+    }
+    if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') {
+        if let Ok(s) = serde_json::from_str::<String>(t) {
+            return Ok(vm.alloc_string(&s));
+        }
+    }
+    Ok(vm.alloc_string(t))
+}
+
+fn quickjs_create(vm: &mut Vm, _args: &[JValue]) -> Result<JValue, NatErr> {
+    alloc(vm, "Lapp/cash/quickjs/QuickJs;", Native::Opaque)
+}
+
+fn quickjs_evaluate(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let src = match args.get(1).and_then(|v| vm.payload_of(*v)) {
+        Some(Native::Str(s)) => s,
+        _ => return Ok(JValue::Null),
+    };
+    eval_js_source(vm, &src)
+}
+
+fn quickjs_compile(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let src = match args.get(1).and_then(|v| vm.payload_of(*v)) {
+        Some(Native::Str(s)) => s,
+        _ => String::new(),
+    };
+    let bytes: Vec<i8> = src.bytes().map(|b| b as i8).collect();
+    let cid = vm.ensure_class_by_desc("[B").map_err(NatErr::Fatal)?;
+    Ok(JValue::Obj(vm.arena.alloc(
+        cid,
+        Vec::new(),
+        Some(Native::Array(ArrayData::Byte(bytes))),
+    )))
+}
+
+fn quickjs_execute(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let src = match args.get(1).and_then(|v| vm.payload_of(*v)) {
+        Some(Native::Array(ArrayData::Byte(bs))) => {
+            String::from_utf8_lossy(bs.iter().map(|&b| b as u8).collect::<Vec<_>>().as_slice())
+                .into_owned()
+        }
+        Some(Native::Str(s)) => s,
+        _ => return Ok(JValue::Null),
+    };
+    eval_js_source(vm, &src)
+}
+
+fn sys_get_property(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let key = match args.first().and_then(|v| vm.payload_of(*v)) {
+        Some(Native::Str(s)) => s,
+        _ => return Ok(args.get(1).copied().unwrap_or(JValue::Null)),
+    };
+    let value = match key.as_str() {
+        "http.agent" => Some(crate::http::USER_AGENT),
+        "java.version" | "java.runtime.version" | "java.vm.version" => Some("17"),
+        "java.vm.name" | "java.vendor" => Some("dexvm"),
+        "java.specification.version" => Some("17"),
+        "java.io.tmpdir" => Some("/tmp"),
+        "user.home" => Some("/"),
+        "user.dir" => Some("/"),
+        "file.encoding" => Some("UTF-8"),
+        "os.name" => Some("Linux"),
+        "os.arch" => Some("aarch64"),
+        "line.separator" => Some("\n"),
+        "file.separator" => Some("/"),
+        "path.separator" => Some(":"),
+        _ => None,
+    };
+    match value {
+        Some(v) => Ok(vm.alloc_string(v)),
+        None => Ok(args.get(1).copied().unwrap_or(JValue::Null)),
+    }
+}
+
+fn sb_append_str(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let this = args.first().copied().unwrap_or(JValue::Null);
+    let add = match args.get(1).copied() {
+        None | Some(JValue::Null) => "null".into(),
+        Some(v) => match vm.payload_of(v) {
+            Some(Native::Str(s) | Native::StringBuilder(s)) => s,
+            _ => "null".into(),
+        },
+    };
+    let JValue::Obj(id) = this else {
+        return Err(NatErr::Throw(vm.err_npe()));
+    };
+    match vm
+        .arena
+        .objects
+        .get_mut(id as usize)
+        .and_then(|o| o.native.as_mut())
+    {
+        Some(Native::StringBuilder(dst)) => dst.push_str(&add),
+        _ => return Err(NatErr::Throw(vm.err_npe())),
+    }
+    Ok(this)
+}
+
+fn smanga_native_mut(vm: &mut Vm, v: JValue) -> Option<&mut Native> {
+    let JValue::Obj(id) = v else { return None };
+    vm.arena.objects.get_mut(id as usize)?.native.as_mut()
+}
+
+fn smanga_get_thumbnail(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let url = match args.first().and_then(|v| vm.payload_of(*v)) {
+        Some(Native::SManga { thumbnail_url, .. }) => thumbnail_url,
+        _ => String::new(),
+    };
+    Ok(vm.alloc_string(&url))
+}
+
+fn smanga_set_thumbnail(vm: &mut Vm, args: &[JValue]) -> Result<JValue, NatErr> {
+    let url = match args.get(1).and_then(|v| vm.payload_of(*v)) {
+        Some(Native::Str(s)) => s,
+        _ => String::new(),
+    };
+    if let Some(Native::SManga { thumbnail_url, .. }) =
+        smanga_native_mut(vm, args.first().copied().unwrap_or(JValue::Null))
+    {
+        *thumbnail_url = url;
+    }
+    Ok(JValue::Null)
 }
