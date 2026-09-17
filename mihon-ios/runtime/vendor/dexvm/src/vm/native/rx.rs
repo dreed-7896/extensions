@@ -269,7 +269,13 @@ fn observable_to_blocking(vm: &mut Vm, args: &[JValue]) -> R {
 }
 
 fn blocking_first(vm: &mut Vm, args: &[JValue]) -> R {
-    let (values, error) = rx_materialize(vm, args[0])?;
+    rx_await_single(vm, args[0])
+}
+
+/// `Observable.awaitSingle()` / `BlockingObservable.first()` — used by 1.4
+/// `HttpSource.getPageList` = `fetchPageList(chapter).awaitSingle()`.
+pub(crate) fn rx_await_single(vm: &mut Vm, observable: JValue) -> R {
+    let (values, error) = rx_materialize(vm, observable)?;
     if let JValue::Obj(error) = error {
         return Err(NatErr::Throw(error));
     }

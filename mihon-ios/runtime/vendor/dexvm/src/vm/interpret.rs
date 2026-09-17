@@ -1466,6 +1466,7 @@ fn as_i32(v: JValue) -> Option<i32> {
         JValue::Long(l) => Some(l as i32),
         JValue::Float(f) => Some(f as i32),
         JValue::Double(d) => Some(d as i32),
+        JValue::Null => Some(0),
         _ => None,
     }
 }
@@ -1476,6 +1477,7 @@ fn as_i64(v: JValue) -> Option<i64> {
         JValue::Int(i) => Some(i as i64),
         JValue::Float(f) => Some(f as i64),
         JValue::Double(d) => Some(d as i64),
+        JValue::Null => Some(0),
         _ => None,
     }
 }
@@ -1486,6 +1488,7 @@ fn as_f32(v: JValue) -> Option<f32> {
         JValue::Double(d) => Some(d as f32),
         JValue::Int(i) => Some(i as f32),
         JValue::Long(l) => Some(l as f32),
+        JValue::Null => Some(0.0),
         _ => None,
     }
 }
@@ -1496,6 +1499,7 @@ fn as_f64(v: JValue) -> Option<f64> {
         JValue::Float(f) => Some(f64::from(f)),
         JValue::Int(i) => Some(f64::from(i)),
         JValue::Long(l) => Some(l as f64),
+        JValue::Null => Some(0.0),
         _ => None,
     }
 }
@@ -1559,11 +1563,27 @@ fn f2l(x: f64) -> i64 {
     }
 }
 
+fn coerce_bits(a: JValue, b: JValue) -> (JValue, JValue) {
+    if matches!(a, JValue::Long(_)) || matches!(b, JValue::Long(_)) {
+        (
+            JValue::Long(as_i64(a).unwrap_or(0)),
+            JValue::Long(as_i64(b).unwrap_or(0)),
+        )
+    } else {
+        (
+            JValue::Int(as_i32(a).unwrap_or(0)),
+            JValue::Int(as_i32(b).unwrap_or(0)),
+        )
+    }
+}
+
 fn binop(vm: &mut Vm, op: Binop, a: JValue, b: JValue) -> Result<JValue, u32> {
     let div_zero = |vm: &mut Vm| vm.err_arithmetic("/ by zero");
     let (a, b) = match op {
         Binop::Add | Binop::Sub | Binop::Mul | Binop::Div | Binop::Rem => coerce_arith(a, b),
-        _ => (a, b),
+        Binop::And | Binop::Or | Binop::Xor | Binop::Shl | Binop::Shr | Binop::Ushr => {
+            coerce_bits(a, b)
+        }
     };
     match (op, a, b) {
         // int

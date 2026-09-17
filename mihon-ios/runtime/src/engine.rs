@@ -335,6 +335,11 @@ fn mihon_get3<T>(
 
 fn fallback_ok(msg: &str) -> bool {
     let m = msg.to_ascii_lowercase();
+    // 1.4 sources stub unused suspend/request hooks with UOE. That is the
+    // signal to try fetch*/classic parse — not a parse/HTTP failure.
+    if m.contains("unsupportedoperation") {
+        return true;
+    }
     if m.contains("uncaught")
         || m.contains("nullpointer")
         || m.contains("http ")
@@ -345,7 +350,6 @@ fn fallback_ok(msg: &str) -> bool {
     }
     m.contains("resolution error")
         || m.contains("no method")
-        || m.contains("unsupportedoperation")
         || m.contains("class not found")
 }
 

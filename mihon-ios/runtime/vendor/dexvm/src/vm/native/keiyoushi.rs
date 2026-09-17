@@ -420,6 +420,19 @@ fn http_source_get_chapters(vm: &mut Vm, args: &[JValue]) -> R {
 }
 
 fn http_source_get_pages(vm: &mut Vm, args: &[JValue]) -> R {
+    // 1.4 HttpSource: `getPageList` = `fetchPageList(chapter).awaitSingle()`.
+    // Sources like PandaChaika override fetchPageList and stub pageListParse.
+    match inv_virt(
+        vm,
+        args[0],
+        "fetchPageList",
+        "(Leu/kanade/tachiyomi/source/model/SChapter;)Lrx/Observable;",
+        &args[1..2],
+    ) {
+        Ok(ob) => return super::rx::rx_await_single(vm, ob),
+        Err(NatErr::Fatal(JvmError::Resolution(_))) => {}
+        Err(e) => return Err(e),
+    }
     http_source_get_suspend(
         vm,
         args,
