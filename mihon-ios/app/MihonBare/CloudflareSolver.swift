@@ -35,6 +35,7 @@ enum CloudflareSolver {
 
         let window = overlayWindow()
         let controller = ChallengeController(url: url)
+        controller.heldWindow = window
         window.rootViewController = controller
         window.makeKeyAndVisible()
 
@@ -69,6 +70,7 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
     private var continuation: CheckedContinuation<Bool, Never>?
     private var timer: Timer?
     private var host: String = ""
+    var heldWindow: UIWindow?
 
     init(url: URL) {
         self.target = url
@@ -127,20 +129,37 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
     }
 
     private func startPolling() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.checkCookies() }
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(
+            timeInterval: 0.6,
+            target: self,
+            selector: #selector(pollCookies),
+            userInfo: nil,
+            repeats: true
+        )
+    }
+
+    @objc private func pollCookies() {
+        copyCookiesThen { [weak self] ok in
+            if ok { self?.complete(true) }
         }
     }
 
-    private func checkCookies() {
+    @objc private func finishTapped() {
+        copyCookiesThen { [weak self] ok in
+            self?.complete(ok)
+        }
+    }
+
+    private func copyCookiesThen(_ done: @escaping (Bool) -> Void) {
         let host = self.host
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
             cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
             let hit = cookies.contains {
                 $0.name == "cf_clearance" && ChallengeController.domainMatches($0.domain, host: host)
             }
-            if hit {
-                Task { @MainActor in self.complete(true) }
+            DispatchQueue.main.async {
+                done(hit)
             }
         }
     }
@@ -148,13 +167,6 @@ private final class ChallengeController: UIViewController, WKNavigationDelegate 
     private static func domainMatches(_ cookieDomain: String, host: String) -> Bool {
         let domain = cookieDomain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
         return host == domain || host.hasSuffix(".\(domain)") || domain.hasSuffix(host)
-    }
-
-    @objc private func finishTapped() {
-        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-            cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
-            self.complete(CloudflareSolver.hasClearance(for: self.host))
-        }
     }
 
     private func complete(_ ok: Bool) {
