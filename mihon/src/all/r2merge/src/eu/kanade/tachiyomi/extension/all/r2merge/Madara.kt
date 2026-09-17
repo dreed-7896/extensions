@@ -86,8 +86,7 @@ internal fun parseMadaraChapterList(html: String, baseUrl: String, scanlator: St
     return unique.values.toList()
 }
 
-private fun madaraHref(link: org.jsoup.nodes.Element): String =
-    link.absUrl("href").ifBlank { link.attr("href") }.trim()
+private fun madaraHref(link: org.jsoup.nodes.Element): String = link.absUrl("href").ifBlank { link.attr("href") }.trim()
 
 /** Title link, not a thumbnail `<a><img>` that often repeats the latest chapter's label. */
 private fun madaraChapterAnchor(item: org.jsoup.nodes.Element): org.jsoup.nodes.Element? {
@@ -120,7 +119,15 @@ private fun betterParsedChapter(a: ParsedChapter, b: ParsedChapter): ParsedChapt
     val score = { chapter: ParsedChapter ->
         val text = chapter.title
         val numbered = leadingChapterNumber(text) != null || overlayChapterNumber(text) != null
-        (if (numbered) 2 else if (text.isNotBlank()) 1 else 0) * 1_000 + text.length.coerceAtMost(200)
+        (
+            if (numbered) {
+                2
+            } else if (text.isNotBlank()) {
+                1
+            } else {
+                0
+            }
+            ) * 1_000 + text.length.coerceAtMost(200)
     }
     return if (score(b) > score(a)) b else a
 }
@@ -170,8 +177,7 @@ private fun hyphenDecimalSlug(url: String): Float? {
 }
 
 /** `/2/` or `/chapter-2/` → 2. */
-private fun plainNumericSlug(url: String): Float? =
-    SLUG_PLAIN.matchEntire(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()
+private fun plainNumericSlug(url: String): Float? = SLUG_PLAIN.matchEntire(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()
 
 internal fun parseMadaraPages(html: String, pageUrl: String): List<Page> {
     val document = Jsoup.parse(html, pageUrl)
