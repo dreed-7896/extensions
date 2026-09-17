@@ -89,6 +89,10 @@ private val ANY_NUMBER = Regex("""(\d+(?:\.\d+)?)""")
 private val LEADING_CHAPTER = Regex(
     """^\s*(\d+(?:\.\d+)?)(?!\d)(?:\s*[.。．\-–—:)|]|\s+|$)""",
 )
+private val SITE_INDEX = Regex(
+    """(?:^|[\n\r>|])\s*(\d+(?:\.\d+)?)\s*[.。．]\s+\S""",
+)
+private val PART_TOKEN = Regex("""\bpart\b""", RegexOption.IGNORE_CASE)
 
 /**
  * Madara/APC list titles look like `0.2 . The Snap - OLD - Chapter 2`.
@@ -99,6 +103,22 @@ fun leadingChapterNumber(rawName: String): Float? {
     if (name.isEmpty()) return null
     return LEADING_CHAPTER.find(name)?.groupValues?.get(1)?.toFloatOrNull()?.takeIf { it >= 0f }
 }
+
+/**
+ * Site list index from a Madara row: `1.6. Title`, or the same token after a
+ * thumbnail caption. `Chapter 1 Part 7` is not an index.
+ */
+fun siteListIndex(rawName: String): Float? {
+    val name = rawName.trim()
+    if (name.isEmpty()) return null
+    leadingChapterNumber(name)?.let { return it }
+    name.lineSequence().forEach { line ->
+        leadingChapterNumber(line)?.let { return it }
+    }
+    return SITE_INDEX.find(name)?.groupValues?.get(1)?.toFloatOrNull()?.takeIf { it >= 0f }
+}
+
+fun hasChapterPart(rawName: String): Boolean = PART_TOKEN.containsMatchIn(rawName)
 
 /**
  * Chapter number taken only from `Chapter 4` / `Ch.4` / `Ep 4` style tokens.

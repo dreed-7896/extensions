@@ -2,8 +2,10 @@ package eu.kanade.tachiyomi.extension.all.r2merge
 
 import eu.kanade.tachiyomi.extension.all.r2merge.meta.SeriesMetadata
 import eu.kanade.tachiyomi.extension.all.r2merge.util.chapterNumberOf
+import eu.kanade.tachiyomi.extension.all.r2merge.util.hasChapterPart
 import eu.kanade.tachiyomi.extension.all.r2merge.util.leadingChapterNumber
 import eu.kanade.tachiyomi.extension.all.r2merge.util.overlayChapterNumber
+import eu.kanade.tachiyomi.extension.all.r2merge.util.siteListIndex
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.Page
 import okhttp3.FormBody
@@ -67,7 +69,15 @@ internal fun parseMadaraChapterList(html: String, baseUrl: String, scanlator: St
         if (href.isBlank() || isMadaraSeriesUrl(href)) return@mapNotNull null
         val title = madaraChapterTitle(link)
         if (title.isBlank()) return@mapNotNull null
-        val number = madaraChapterNumber(title, href)
+        // Link text only — the row's thumbnail `<a>` often repeats the latest chapter's `2 . …`.
+        val context = listOf(
+            madaraRowText(link),
+            item.ownText(),
+            item.selectFirst(".chapter-num, .chapternum, .wp-manga-chapter-num, [class*=chapter-num]")?.text().orEmpty(),
+        ).filter { it.isNotBlank() }.joinToString("\n")
+        val attrNumber = listOf("data-num", "data-chapter-number")
+            .firstNotNullOfOrNull { item.attr(it).trim().toFloatOrNull() }
+        val number = madaraChapterNumber(title, href, attrNumber, context)
         ParsedChapter(
             title = title,
             number = number,
@@ -147,19 +157,29 @@ private fun madaraChapterTitle(link: org.jsoup.nodes.Element): String {
 
 /**
  * Site chapter number for `titles` / `chapterRange`.
- * `0.2 . … Chapter 2` and slug `/0-2/` stay 0.2; `/2/` must not beat `Chapter 1` in the title.
+ * `1.6. … Chapter 1 Part 7` is 1.6, not 1. Slug `/1-6-…` is 1.6.
+ * `Chapter N` must not win while `Part` is in the title.
  */
-internal fun madaraChapterNumber(title: String, href: String, attrNumber: Float? = null): Float {
-    attrNumber?.takeIf { it > 0f && it < 10_000f }?.let { return it }
-    leadingChapterNumber(title)?.takeIf { it > 0f }?.let { return it }
+internal fun madaraChapterNumber(
+    title: String,
+    href: String,
+    attrNumber: Float? = null,
+    context: String = "",
+): Float {
+    siteListIndex(title)?.takeIf { it > 0f }?.let { return it }
+    siteListIndex(context)?.takeIf { it > 0f }?.let { return it }
     hyphenDecimalSlug(href)?.takeIf { it > 0f }?.let { return it }
-    overlayChapterNumber(title)?.let { return it }
+    dottedDecimalSlug(href)?.takeIf { it > 0f }?.let { return it }
+    attrNumber?.takeIf { it > 0f && it < 1_000f }?.let { return it }
+    overlayChapterNumber(title)?.takeIf { !hasChapterPart(title) }?.let { return it }
+    overlayChapterNumber(context)?.takeIf { context.isNotBlank() && !hasChapterPart(context) }?.let { return it }
     plainNumericSlug(href)?.takeIf { it > 0f }?.let { return it }
-    chapterNumberOf(title).takeIf { it >= 0f }?.let { return it }
+    chapterNumberOf(title).takeIf { it >= 0f && !hasChapterPart(title) }?.let { return it }
     return 0f
 }
 
-private val SLUG_DECIMAL = Regex("""^(\d+)-(\d+)$""")
+private val SLUG_DECIMAL = Regex("""^(\d+)-(\d+)(?:-|$)""")
+private val SLUG_DOTTED = Regex("""^(\d+\.\d+)(?:-|$)""")
 private val SLUG_PLAIN = Regex("""^(\d+(?:\.\d+)?)$""")
 private val SLUG_PREFIX = Regex("""^(?:ch(?:apter)?|ep(?:isode)?)-?""", RegexOption.IGNORE_CASE)
 
@@ -169,15 +189,24 @@ private fun madaraSlug(url: String): String {
     return seg.replace(SLUG_PREFIX, "")
 }
 
-/** `/0-2/` or `/chapter-0-2/` → 0.2. Not `2-the-snap-chapter-2`. */
+/** `/0-2/` `/chapter-0-2/` `/1-6-the-snap-…` → 0.2 / 1.6. Not `2-the-snap-chapter-2`. */
 private fun hyphenDecimalSlug(url: String): Float? {
-    val stripped = madaraSlug(url)
-    val match = SLUG_DECIMAL.matchEntire(stripped) ?: return null
+    val match = SLUG_DECIMAL.find(madaraSlug(url)) ?: return null
     return "${match.groupValues[1]}.${match.groupValues[2]}".toFloatOrNull()
 }
 
+/** `/1.6/` or `/1.6-the-snap/` → 1.6. */
+private fun dottedDecimalSlug(url: String): Float? =
+    SLUG_DOTTED.find(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()
+
 /** `/2/` or `/chapter-2/` → 2. */
 private fun plainNumericSlug(url: String): Float? = SLUG_PLAIN.matchEntire(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()
+
+private fun madaraRowText(item: org.jsoup.nodes.Element): String {
+    val copy = item.clone()
+    copy.select("img, .chapter-release-date, .c-new-tag, time").remove()
+    return copy.text().trim()
+}
 
 internal fun parseMadaraPages(html: String, pageUrl: String): List<Page> {
     val document = Jsoup.parse(html, pageUrl)
