@@ -1,0 +1,21 @@
+name: build-ios-ipa
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  ipa:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - name: Build rust host + LiveContainer IPA
+        run: bash mihon-ios/scripts/build-ipa.sh aarch64-apple-ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MihonBare.ipa
+          path: mihon-ios/dist/MihonBare.ipa
+          if-no-files-found: error

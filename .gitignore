@@ -1,0 +1,6 @@
+target/
+**/*.ipa
+.DS_Store
+mihon-ios/app/libs/
+mihon-ios/runtime/target/
+mihon-ios/dist/

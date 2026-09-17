@@ -1,0 +1,298 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* MihonBareApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* MihonBareApp.swift */; };
+		A10000000000000000000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* Models.swift */; };
+		A10000000000000000000003 /* MihonEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* MihonEngine.swift */; };
+		A10000000000000000000004 /* RepoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* RepoView.swift */; };
+		A10000000000000000000005 /* ExtensionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* ExtensionStore.swift */; };
+		A10000000000000000000006 /* BrowseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* BrowseViews.swift */; };
+		A1000000000000000000000A /* MihonConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* MihonConfig.swift */; };
+		A1000000000000000000000B /* HostHTTP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* HostHTTP.swift */; };
+		A1000000000000000000000C /* CloudflareSolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* CloudflareSolver.swift */; };
+		A1000000000000000000000D /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* RemoteImage.swift */; };
+		A10000000000000000000007 /* libmihon_host.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* libmihon_host.a */; };
+		A10000000000000000000008 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* Security.framework */; };
+		A10000000000000000000009 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* SystemConfiguration.framework */; };
+		A1000000000000000000000E /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* WebKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* MihonBareApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihonBareApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* MihonEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihonEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* RepoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoView.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* ExtensionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* BrowseViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseViews.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* MihonConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MihonConfig.swift; sourceTree = "<group>"; };
+		A2000000000000000000000E /* HostHTTP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostHTTP.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* CloudflareSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareSolver.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* libmihon_host.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libmihon_host.a; sourceTree = "<group>"; };
+		A20000000000000000000008 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		A20000000000000000000009 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
+		A20000000000000000000011 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		A2000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000000B /* MihonBare-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MihonBare-Bridging-Header.h"; sourceTree = "<group>"; };
+		A2000000000000000000000C /* MihonBare.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MihonBare.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000007 /* libmihon_host.a in Frameworks */,
+				A10000000000000000000008 /* Security.framework in Frameworks */,
+				A10000000000000000000009 /* SystemConfiguration.framework in Frameworks */,
+				A1000000000000000000000E /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* MihonBare */,
+				A40000000000000000000003 /* Frameworks */,
+				A40000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* MihonBare */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* MihonBareApp.swift */,
+				A20000000000000000000002 /* Models.swift */,
+				A20000000000000000000003 /* MihonEngine.swift */,
+				A20000000000000000000004 /* RepoView.swift */,
+				A20000000000000000000005 /* ExtensionStore.swift */,
+				A20000000000000000000006 /* BrowseViews.swift */,
+				A2000000000000000000000D /* MihonConfig.swift */,
+				A2000000000000000000000E /* HostHTTP.swift */,
+				A2000000000000000000000F /* CloudflareSolver.swift */,
+				A20000000000000000000010 /* RemoteImage.swift */,
+				A2000000000000000000000A /* Info.plist */,
+				A2000000000000000000000B /* MihonBare-Bridging-Header.h */,
+			);
+			path = MihonBare;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000007 /* libmihon_host.a */,
+				A20000000000000000000008 /* Security.framework */,
+				A20000000000000000000009 /* SystemConfiguration.framework */,
+				A20000000000000000000011 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000C /* MihonBare.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* MihonBare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A60000000000000000000002 /* Build configuration list for PBXNativeTarget "MihonBare" */;
+			buildPhases = (
+				A70000000000000000000001 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A70000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MihonBare;
+			productName = MihonBare;
+			productReference = A2000000000000000000000C /* MihonBare.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A80000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A60000000000000000000001 /* Build configuration list for PBXProject "MihonBare" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			productRefGroup = A40000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* MihonBare */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A70000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A70000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* MihonBareApp.swift in Sources */,
+				A10000000000000000000002 /* Models.swift in Sources */,
+				A10000000000000000000003 /* MihonEngine.swift in Sources */,
+				A10000000000000000000004 /* RepoView.swift in Sources */,
+				A10000000000000000000005 /* ExtensionStore.swift in Sources */,
+				A10000000000000000000006 /* BrowseViews.swift in Sources */,
+				A1000000000000000000000A /* MihonConfig.swift in Sources */,
+				A1000000000000000000000B /* HostHTTP.swift in Sources */,
+				A1000000000000000000000C /* CloudflareSolver.swift in Sources */,
+				A1000000000000000000000D /* RemoteImage.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A90000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A90000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A90000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/../runtime/include";
+				INFOPLIST_FILE = MihonBare/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/libs";
+				OTHER_LDFLAGS = (
+					"-lmihon_host",
+					"-lc++",
+					"-liconv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mihonbare.app;
+				PRODUCT_NAME = MihonBare;
+				SWIFT_OBJC_BRIDGING_HEADER = "MihonBare/MihonBare-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A90000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_BITCODE = NO;
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/../runtime/include";
+				INFOPLIST_FILE = MihonBare/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/libs";
+				OTHER_LDFLAGS = (
+					"-lmihon_host",
+					"-lc++",
+					"-liconv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mihonbare.app;
+				PRODUCT_NAME = MihonBare;
+				SWIFT_OBJC_BRIDGING_HEADER = "MihonBare/MihonBare-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A60000000000000000000001 /* Build configuration list for PBXProject "MihonBare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000001 /* Debug */,
+				A90000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A60000000000000000000002 /* Build configuration list for PBXNativeTarget "MihonBare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000003 /* Debug */,
+				A90000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A80000000000000000000001 /* Project object */;
+}
