@@ -24,7 +24,6 @@
 		A10000000000000000000009 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* SystemConfiguration.framework */; };
 		A1000000000000000000000E /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* WebKit.framework */; };
 		A10000000000000000000021 /* JavaScriptCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* JavaScriptCore.framework */; };
-		A10000000000000000000023 /* Compression.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* Compression.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,7 +44,6 @@
 		A20000000000000000000009 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		A20000000000000000000011 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		A20000000000000000000021 /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		A20000000000000000000023 /* Compression.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Compression.framework; path = System/Library/Frameworks/Compression.framework; sourceTree = SDKROOT; };
 		A2000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2000000000000000000000B /* MihonBare-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MihonBare-Bridging-Header.h"; sourceTree = "<group>"; };
 		A2000000000000000000000C /* MihonBare.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MihonBare.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -61,7 +59,6 @@
 				A10000000000000000000009 /* SystemConfiguration.framework in Frameworks */,
 				A1000000000000000000000E /* WebKit.framework in Frameworks */,
 				A10000000000000000000021 /* JavaScriptCore.framework in Frameworks */,
-				A10000000000000000000023 /* Compression.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,7 +103,6 @@
 				A20000000000000000000009 /* SystemConfiguration.framework */,
 				A20000000000000000000011 /* WebKit.framework */,
 				A20000000000000000000021 /* JavaScriptCore.framework */,
-				A20000000000000000000023 /* Compression.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -253,6 +249,7 @@
 					"-lmihon_host",
 					"-lc++",
 					"-liconv",
+					"-lz",
 					"-framework",
 					"JavaScriptCore",
 				);
@@ -281,6 +278,7 @@
 					"-lmihon_host",
 					"-lc++",
 					"-liconv",
+					"-lz",
 					"-framework",
 					"JavaScriptCore",
 				);

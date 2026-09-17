@@ -1,5 +1,5 @@
-import Compression
 import Foundation
+import zlib
 
 enum RepoCatalog {
     static func parse(_ data: Data) -> [RepoExtension] {
@@ -31,45 +31,42 @@ enum RepoCatalog {
     }
 
     private static func gunzipIfNeeded(_ data: Data) -> Data {
-        guard data.count > 18, data[0] == 0x1f, data[1] == 0x8b else { return data }
-        guard let deflate = gzipPayload(data) else { return data }
-        var cap = max(deflate.count * 8, 256 * 1024)
-        for _ in 0..<4 {
-            var out = Data(count: cap)
-            let n = out.withUnsafeMutableBytes { dst -> Int in
-                deflate.withUnsafeBytes { src -> Int in
-                    guard let d = dst.bindMemory(to: UInt8.self).baseAddress,
-                          let s = src.bindMemory(to: UInt8.self).baseAddress
-                    else { return -1 }
-                    return compression_decode_buffer(d, cap, s, deflate.count, nil, COMPRESSION_ZLIB)
-                }
-            }
-            if n > 0 { return out.prefix(n) }
-            cap *= 2
-        }
-        return data
+        guard data.count > 2, data[0] == 0x1f, data[1] == 0x8b else { return data }
+        return inflateGzip(data) ?? data
     }
 
-    private static func gzipPayload(_ data: Data) -> Data? {
-        guard data.count > 18, data[2] == 8 else { return nil }
-        var i = 10
-        let flags = data[3]
-        if flags & 4 != 0 {
-            guard i + 2 <= data.count else { return nil }
-            let xlen = Int(data[i]) | (Int(data[i + 1]) << 8)
-            i += 2 + xlen
+    private static func inflateGzip(_ data: Data) -> Data? {
+        data.withUnsafeBytes { raw -> Data? in
+            guard let inPtr = raw.bindMemory(to: Bytef.self).baseAddress else { return nil }
+            var stream = z_stream()
+            stream.next_in = UnsafeMutablePointer(mutating: inPtr)
+            stream.avail_in = uInt(raw.count)
+            let initRc = inflateInit2_(
+                &stream,
+                16 + MAX_WBITS,
+                ZLIB_VERSION,
+                Int32(MemoryLayout<z_stream>.size)
+            )
+            guard initRc == Z_OK else { return nil }
+            defer { inflateEnd(&stream) }
+
+            let chunk = 64 * 1024
+            var out = Data()
+            var buf = [UInt8](repeating: 0, count: chunk)
+            while true {
+                let rc = buf.withUnsafeMutableBytes { dst -> Int32 in
+                    stream.next_out = dst.bindMemory(to: Bytef.self).baseAddress
+                    stream.avail_out = uInt(dst.count)
+                    return inflate(&stream, Z_NO_FLUSH)
+                }
+                let produced = chunk - Int(stream.avail_out)
+                if produced > 0 {
+                    out.append(contentsOf: buf.prefix(produced))
+                }
+                if rc == Z_STREAM_END { return out }
+                if rc != Z_OK { return nil }
+            }
         }
-        if flags & 8 != 0 {
-            while i < data.count, data[i] != 0 { i += 1 }
-            i += 1
-        }
-        if flags & 16 != 0 {
-            while i < data.count, data[i] != 0 { i += 1 }
-            i += 1
-        }
-        if flags & 2 != 0 { i += 2 }
-        guard i + 8 < data.count else { return nil }
-        return data.subdata(in: i..<(data.count - 8))
     }
 
     private static func parseProtobuf(_ data: Data) -> [RepoExtension] {
