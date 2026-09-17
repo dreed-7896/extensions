@@ -126,19 +126,14 @@ enum HostHTTP {
             || body.contains("cf-chl")
             || body.contains("_cf_chl")
             || body.contains("enable javascript and cookies to continue")
-            || body.contains("attention required")
-            || body.contains("ddos-guard")
-            || body.contains("checking your browser")
-            || body.contains("verify you are human")
-            || body.contains("cf-turnstile")
-            || body.contains("turnstile")
-            || body.contains("cdn-cgi/challenge")
+            || body.contains("checking your browser before accessing")
+            || body.contains("cdn-cgi/challenge-platform")
             || body.contains("challenge-error-title")
             || body.contains("cf-browser-verification")
-            || body.contains("managed challenge")
+            || (body.contains("cf-turnstile") && body.contains("cdn-cgi"))
         if challenged { return true }
         if r.code == 403 || r.code == 503 || r.code == 429 {
-            return server.contains("cloudflare") || body.contains("cloudflare")
+            return server.contains("cloudflare") || server.contains("ddos-guard") || body.contains("cloudflare") || body.contains("ddos-guard")
         }
         return false
     }

@@ -550,15 +550,38 @@ fn object_members(vm: &Vm, element: JValue) -> Vec<(String, JsonVal)> {
 }
 
 fn member_by_index(vm: &Vm, element: JValue, descriptor: JValue, index: i32) -> Option<JsonVal> {
-    let names = match payload(vm, descriptor) {
-        Some(Native::SerialDescriptor { elements, .. }) => elements.clone(),
-        _ => return None,
-    };
-    let name = names.get(index as usize)?.clone();
-    object_members(vm, element)
-        .into_iter()
-        .find(|(k, _)| *k == name)
-        .map(|(_, v)| v)
+    match payload(vm, element) {
+        Some(Native::Json(JsonVal::Array(items))) => items.get(index as usize).cloned(),
+        Some(Native::Json(JsonVal::Object(members))) => {
+            let names = match payload(vm, descriptor) {
+                Some(Native::SerialDescriptor { elements, .. }) => elements.clone(),
+                _ => return None,
+            };
+            let name = names.get(index as usize)?;
+            members
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        }
+        Some(Native::Json(v)) if index == 0 => Some(v.clone()),
+        _ => None,
+    }
+}
+
+fn jsonval_as_f64(v: &JsonVal) -> f64 {
+    match v {
+        JsonVal::Double(d) => *d,
+        JsonVal::Int(i) => *i as f64,
+        JsonVal::Bool(b) => {
+            if *b {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        JsonVal::Str(s) => s.parse().unwrap_or(0.0),
+        _ => 0.0,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -891,18 +914,18 @@ pub(crate) fn dec_begin_structure(vm: &mut Vm, args: &[JValue]) -> R {
     Ok(args[0])
 }
 
-/// `CompositeDecoder.decodeSequentially()` — always sequential; the
-/// generated serializers then walk elements by descriptor index.
+/// `CompositeDecoder.decodeSequentially()` — kotlinx JSON returns false
+/// because object keys are unordered and unknown keys must be skipped.
 pub(crate) fn dec_decode_sequentially(_vm: &mut Vm, _args: &[JValue]) -> R {
     if std::env::var("DEXVM_TRACE").is_ok() {
         eprintln!("DEXVM_TRACE native dec_decode_sequentially");
     }
-    Ok(JValue::Int(1))
+    Ok(JValue::Int(0))
 }
 
-/// `CompositeDecoder.decodeElementIndex(descriptor)` — walks the object
-/// members in order, returning descriptor indexes of matching keys, or -1
-/// when exhausted (non-sequential fallback; unused in the sequential path).
+/// `CompositeDecoder.decodeElementIndex(descriptor)` — next JSON member that
+/// exists on the descriptor, by name (not JSON order). Unknown keys are
+/// skipped (`ignoreUnknownKeys`). Arrays are positional.
 pub(crate) fn dec_decode_element_index(vm: &mut Vm, args: &[JValue]) -> R {
     if std::env::var("DEXVM_TRACE").is_ok() {
         eprintln!("DEXVM_TRACE native dec_decode_element_index");
@@ -911,23 +934,38 @@ pub(crate) fn dec_decode_element_index(vm: &mut Vm, args: &[JValue]) -> R {
         Some(Native::JsonDecoder { element, .. }) => *element,
         _ => return Err(npe(vm)),
     };
+    let cursor = match payload(vm, args[0]) {
+        Some(Native::JsonDecoder { index, .. }) => *index,
+        _ => return Err(npe(vm)),
+    };
+    if let Some(Native::Json(JsonVal::Array(items))) = payload(vm, element) {
+        let n = items.len() as i32;
+        if cursor < 0 || cursor >= n {
+            return Ok(JValue::Int(-1));
+        }
+        if let Some(Native::JsonDecoder { index, .. }) = payload_mut(vm, args[0]) {
+            *index = cursor + 1;
+        }
+        return Ok(JValue::Int(cursor));
+    }
     let members = object_members(vm, element);
     let names = match payload(vm, args[1]) {
         Some(Native::SerialDescriptor { elements, .. }) => elements.clone(),
         _ => Vec::new(),
     };
-    let index = match payload_mut(vm, args[0]) {
-        Some(Native::JsonDecoder { index, .. }) => *index,
-        _ => return Err(npe(vm)),
-    };
-    let mut i = index as usize;
+    let mut i = cursor as usize;
     while i < members.len() {
         let name = &members[i].0;
-        if names.get(i).is_some_and(|n| n == name) {
+        if let Some(desc_idx) = names.iter().position(|n| n == name) {
+            if std::env::var("DEXVM_TRACE").is_ok() {
+                eprintln!(
+                    "DEXVM_TRACE decodeElementIndex key={name} desc={desc_idx} names={names:?}"
+                );
+            }
             if let Some(Native::JsonDecoder { index, .. }) = payload_mut(vm, args[0]) {
                 *index = (i + 1) as i32;
             }
-            return Ok(JValue::Int(i as i32));
+            return Ok(JValue::Int(desc_idx as i32));
         }
         i += 1;
     }
@@ -955,6 +993,14 @@ fn member_primitive(vm: &Vm, args: &[JValue]) -> Option<JsonVal> {
         Some(Native::JsonDecoder { element, .. }) => *element,
         _ => return None,
     };
+    // `(SerialDescriptor;I)` has index in args[2]. Some generated/R8 call
+    // sites only pass the descriptor — treat that as the current element.
+    if args.len() < 3 {
+        return match payload(vm, element) {
+            Some(Native::Json(v)) => Some(v.clone()),
+            _ => None,
+        };
+    }
     let index = int_of(vm, args[2]);
     member_by_index(vm, element, args[1], index)
 }
@@ -994,6 +1040,89 @@ pub(crate) fn dec_decode_bool_element(vm: &mut Vm, args: &[JValue]) -> R {
         JsonVal::Str(s) => i32::from(!matches!(s.as_str(), "false" | "0" | "")),
         _ => 0,
     }))
+}
+
+pub(crate) fn dec_decode_double_element(vm: &mut Vm, args: &[JValue]) -> R {
+    let v = member_primitive(vm, args).unwrap_or(JsonVal::Null);
+    Ok(JValue::Double(jsonval_as_f64(&v)))
+}
+
+pub(crate) fn dec_decode_float_element(vm: &mut Vm, args: &[JValue]) -> R {
+    let v = member_primitive(vm, args).unwrap_or(JsonVal::Null);
+    Ok(JValue::Float(jsonval_as_f64(&v) as f32))
+}
+
+pub(crate) fn dec_decode_byte_element(vm: &mut Vm, args: &[JValue]) -> R {
+    let v = member_primitive(vm, args).unwrap_or(JsonVal::Int(0));
+    Ok(JValue::Int(jsonval_as_f64(&v) as i32))
+}
+
+pub(crate) fn dec_decode_not_null_mark(vm: &mut Vm, args: &[JValue]) -> R {
+    let element = match payload(vm, args[0]) {
+        Some(Native::JsonDecoder { element, .. }) => *element,
+        _ => return Ok(JValue::Int(0)),
+    };
+    let not_null = !matches!(payload(vm, element), Some(Native::Json(JsonVal::Null)));
+    Ok(JValue::Int(i32::from(not_null)))
+}
+
+pub(crate) fn dec_decode_null(_vm: &mut Vm, _args: &[JValue]) -> R {
+    Ok(JValue::Null)
+}
+
+pub(crate) fn dec_decode_inline(_vm: &mut Vm, args: &[JValue]) -> R {
+    Ok(args.first().copied().unwrap_or(JValue::Null))
+}
+
+pub(crate) fn dec_decode_double(vm: &mut Vm, args: &[JValue]) -> R {
+    let element = match payload(vm, args[0]) {
+        Some(Native::JsonDecoder { element, .. }) => *element,
+        _ => return Ok(JValue::Double(0.0)),
+    };
+    let v = match payload(vm, element) {
+        Some(Native::Json(v)) => jsonval_as_f64(v),
+        _ => 0.0,
+    };
+    Ok(JValue::Double(v))
+}
+
+pub(crate) fn dec_decode_float(vm: &mut Vm, args: &[JValue]) -> R {
+    let element = match payload(vm, args[0]) {
+        Some(Native::JsonDecoder { element, .. }) => *element,
+        _ => return Ok(JValue::Float(0.0)),
+    };
+    let v = match payload(vm, element) {
+        Some(Native::Json(v)) => jsonval_as_f64(v) as f32,
+        _ => 0.0,
+    };
+    Ok(JValue::Float(v))
+}
+
+pub(crate) fn dec_decode_long(vm: &mut Vm, args: &[JValue]) -> R {
+    let element = match payload(vm, args[0]) {
+        Some(Native::JsonDecoder { element, .. }) => *element,
+        _ => return Ok(JValue::Long(0)),
+    };
+    let v = match payload(vm, element) {
+        Some(Native::Json(JsonVal::Int(i))) => *i,
+        Some(Native::Json(JsonVal::Double(d))) => *d as i64,
+        Some(Native::Json(JsonVal::Str(s))) => s.parse().unwrap_or(0),
+        _ => 0,
+    };
+    Ok(JValue::Long(v))
+}
+
+pub(crate) fn dec_decode_bool(vm: &mut Vm, args: &[JValue]) -> R {
+    let element = match payload(vm, args[0]) {
+        Some(Native::JsonDecoder { element, .. }) => *element,
+        _ => return Ok(JValue::Int(0)),
+    };
+    let v = match payload(vm, element) {
+        Some(Native::Json(JsonVal::Bool(b))) => i32::from(*b),
+        Some(Native::Json(JsonVal::Int(i))) => i32::from(*i != 0),
+        _ => 0,
+    };
+    Ok(JValue::Int(v))
 }
 
 /// `CompositeDecoder.decodeCollectionSize(descriptor)`.
@@ -1694,6 +1823,14 @@ fn polymorphic_deserialize(vm: &mut Vm, args: &[JValue]) -> R {
     let mut found = scan(vm, matching_bases, &mut fallback, &mut candidates)?;
     if found.is_none() && candidates.is_empty() {
         found = scan(vm, other_bases, &mut fallback, &mut candidates)?;
+    }
+    if std::env::var("DEXVM_TRACE").is_ok() {
+        eprintln!(
+            "DEXVM_TRACE poly disc={discriminator} found={} candidates={} fallback={}",
+            found.is_some(),
+            candidates.join("|"),
+            fallback.is_some()
+        );
     }
     let serializer = if let Some((_, serializer)) = found {
         serializer
@@ -2673,6 +2810,83 @@ pub(crate) const SERIALIZATION_TABLE: &[NativeEntry] = &[
     ),
     ne!(
         "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeDoubleElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)D",
+        true,
+        dec_decode_double_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeDoubleElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;)D",
+        true,
+        dec_decode_double_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeFloatElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)F",
+        true,
+        dec_decode_float_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeFloatElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;)F",
+        true,
+        dec_decode_float_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/encoding/CompositeDecoder;",
+        "decodeDoubleElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)D",
+        true,
+        dec_decode_double_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/encoding/CompositeDecoder;",
+        "decodeDoubleElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;)D",
+        true,
+        dec_decode_double_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/encoding/CompositeDecoder;",
+        "decodeFloatElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)F",
+        true,
+        dec_decode_float_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/encoding/CompositeDecoder;",
+        "decodeFloatElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;)F",
+        true,
+        dec_decode_float_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeByteElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)B",
+        true,
+        dec_decode_byte_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeShortElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)S",
+        true,
+        dec_decode_byte_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeCharElement",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)C",
+        true,
+        dec_decode_byte_element
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
         "decodeCollectionSize",
         "(Lkotlinx/serialization/descriptors/SerialDescriptor;)I",
         true,
@@ -2719,6 +2933,55 @@ pub(crate) const SERIALIZATION_TABLE: &[NativeEntry] = &[
         "()I",
         true,
         dec_decode_int
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeLong",
+        "()J",
+        true,
+        dec_decode_long
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeDouble",
+        "()D",
+        true,
+        dec_decode_double
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeFloat",
+        "()F",
+        true,
+        dec_decode_float
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeBoolean",
+        "()Z",
+        true,
+        dec_decode_bool
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeNotNullMark",
+        "()Z",
+        true,
+        dec_decode_not_null_mark
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeNull",
+        "()Ljava/lang/Void;",
+        true,
+        dec_decode_null
+    ),
+    ne!(
+        "Lkotlinx/serialization/json/internal/StreamingJsonDecoder;",
+        "decodeInline",
+        "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlinx/serialization/encoding/Decoder;",
+        true,
+        dec_decode_inline
     ),
     ne!(
         "Lkotlinx/serialization/internal/PluginGeneratedSerialDescriptor;",

@@ -265,6 +265,24 @@ pub(crate) fn http_source_headers_builder(vm: &mut Vm, _args: &[JValue]) -> R {
     alloc(vm, "Lokhttp3/Headers$Builder;", Native::Headers(Vec::new()))
 }
 
+fn http_source_call_success(vm: &mut Vm, receiver: JValue, request: JValue) -> R {
+    let client = inv_virt(
+        vm,
+        receiver,
+        "getClient",
+        "()Lokhttp3/OkHttpClient;",
+        &[],
+    )?;
+    let call = inv_virt(
+        vm,
+        client,
+        "newCall",
+        "(Lokhttp3/Request;)Lokhttp3/Call;",
+        &[request],
+    )?;
+    okhttp_await_success(vm, &[call])
+}
+
 fn http_source_fetch(
     vm: &mut Vm,
     receiver: JValue,
@@ -276,7 +294,7 @@ fn http_source_fetch(
 ) -> R {
     let result = (|| {
         let request = inv_virt(vm, receiver, request_name, request_sig, request_args)?;
-        let response = keiyoushi_execute(vm, &[request])?;
+        let response = http_source_call_success(vm, receiver, request)?;
         inv_virt(vm, receiver, parse_name, parse_sig, &[response])
     })();
     rx::rx_from_result(vm, result)
@@ -324,6 +342,9 @@ fn http_source_fetch_image_url(vm: &mut Vm, args: &[JValue]) -> R {
 /// host bridges them to `fetchXxx(...).awaitSingle()`, whose observable is
 /// evaluated synchronously here, so the continuation argument is dropped and
 /// the single value returned instead of `COROUTINE_SUSPENDED`.
+/// Mihon `HttpSource.getPopularManga`: `client.newCall(req).awaitSuccess()`
+/// then parse. Challenge HTML remapped to 403 must throw here — parsing it
+/// as a catalog yields zero titles.
 fn http_source_get_suspend(
     vm: &mut Vm,
     args: &[JValue],
@@ -333,16 +354,9 @@ fn http_source_get_suspend(
     parse_name: &str,
     parse_sig: &str,
 ) -> R {
-    let result = (|| {
-        let request = inv_virt(vm, args[0], request_name, request_sig, request_args)?;
-        let response = keiyoushi_execute(vm, &[request])?;
-        inv_virt(vm, args[0], parse_name, parse_sig, &[response])
-    })();
-    match result {
-        Ok(value) => Ok(value),
-        Err(NatErr::Throw(error)) => Err(NatErr::Throw(error)),
-        Err(error) => Err(error),
-    }
+    let request = inv_virt(vm, args[0], request_name, request_sig, request_args)?;
+    let response = http_source_call_success(vm, args[0], request)?;
+    inv_virt(vm, args[0], parse_name, parse_sig, &[response])
 }
 
 fn http_source_get_popular(vm: &mut Vm, args: &[JValue]) -> R {
@@ -523,22 +537,54 @@ fn obj_url(vm: &mut Vm, v: JValue) -> Option<String> {
     }
 }
 
+fn join_base(base: &str, url: &str) -> String {
+    let url = url.trim();
+    if url.is_empty() {
+        return base.to_string();
+    }
+    if url.starts_with("http://") || url.starts_with("https://") {
+        return url.to_string();
+    }
+    if url.starts_with("//") {
+        return format!("https:{url}");
+    }
+    let base = base.trim_end_matches('/');
+    if url.starts_with('/') {
+        format!("{base}{url}")
+    } else {
+        format!("{base}/{url}")
+    }
+}
+
+fn source_headers(vm: &mut Vm, src: JValue) -> Vec<(String, String)> {
+    if !matches!(src, JValue::Obj(_)) {
+        return Vec::new();
+    }
+    match inv_virt(vm, src, "getHeaders", "()Lokhttp3/Headers;", &[]) {
+        Ok(h) => match payload(vm, h) {
+            Some(Native::Headers(pairs)) => pairs.clone(),
+            _ => Vec::new(),
+        },
+        Err(_) => Vec::new(),
+    }
+}
+
 fn http_source_get_request(vm: &mut Vm, src: JValue, obj: JValue) -> R {
     let Some(url) = obj_url(vm, obj) else {
         return Err(npe(vm));
     };
-    let full = if url.starts_with("http") {
-        url
-    } else {
-        format!("{}{url}", source_base_url(vm, src)?)
-    };
+    if url.is_empty() {
+        return Err(npe(vm));
+    }
+    let full = join_base(&source_base_url(vm, src)?, &url);
+    let headers = source_headers(vm, src);
     alloc(
         vm,
         REQUEST,
         Native::Request {
             url: full,
             method: "GET".into(),
-            headers: Vec::new(),
+            headers,
             body: None,
         },
     )
@@ -548,11 +594,7 @@ fn http_source_get_url(vm: &mut Vm, src: JValue, obj: JValue) -> R {
     let Some(url) = obj_url(vm, obj) else {
         return Err(npe(vm));
     };
-    let full = if url.starts_with("http") {
-        url
-    } else {
-        format!("{}{url}", source_base_url(vm, src)?)
-    };
+    let full = join_base(&source_base_url(vm, src)?, &url);
     Ok(new_str(vm, &full))
 }
 
@@ -581,19 +623,31 @@ pub(crate) fn http_source_page_list_request(vm: &mut Vm, args: &[JValue]) -> R {
     http_source_get_request(vm, args[0], args[1])
 }
 
-/// Host default for `imageRequest`: `GET page.imageUrl`.
+/// Host default for `imageRequest`: `GET page.imageUrl` with source headers.
 pub(crate) fn http_source_image_request(vm: &mut Vm, args: &[JValue]) -> R {
     let url = match payload(vm, args[1]) {
-        Some(Native::SPPage { image_url, .. }) => image_url.clone(),
+        Some(Native::SPPage {
+            image_url, url, ..
+        }) => {
+            if image_url.is_empty() {
+                url.clone()
+            } else {
+                image_url.clone()
+            }
+        }
         _ => return Err(npe(vm)),
     };
+    if url.is_empty() {
+        return Err(npe(vm));
+    }
+    let headers = source_headers(vm, args[0]);
     alloc(
         vm,
         REQUEST,
         Native::Request {
             url,
             method: "GET".into(),
-            headers: Vec::new(),
+            headers,
             body: None,
         },
     )

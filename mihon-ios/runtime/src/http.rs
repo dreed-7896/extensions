@@ -188,27 +188,26 @@ pub fn is_challenge(code: i32, headers: &[(String, String)], body: &[u8]) -> boo
     }
     let n = body.len().min(16_384);
     let text = String::from_utf8_lossy(&body[..n]).to_ascii_lowercase();
+    // Interstitial pages only — real catalogs often mention turnstile/CF in JS.
     if text.contains("just a moment")
         || text.contains("challenge-platform")
         || text.contains("cf-chl")
         || text.contains("_cf_chl")
         || text.contains("enable javascript and cookies to continue")
-        || text.contains("checking your browser")
-        || text.contains("ddos-guard")
-        || text.contains("attention required")
-        || text.contains("verify you are human")
-        || text.contains("cf-turnstile")
-        || text.contains("turnstile")
-        || text.contains("cdn-cgi/challenge")
+        || text.contains("checking your browser before accessing")
+        || text.contains("cdn-cgi/challenge-platform")
         || text.contains("challenge-error-title")
         || text.contains("cf-browser-verification")
-        || text.contains("managed challenge")
+        || (text.contains("cf-turnstile") && text.contains("cdn-cgi"))
     {
         return true;
     }
     let server = header("server");
     (code == 403 || code == 503 || code == 429)
-        && (server.contains("cloudflare") || text.contains("cloudflare"))
+        && (server.contains("cloudflare")
+            || server.contains("ddos-guard")
+            || text.contains("cloudflare")
+            || text.contains("ddos-guard"))
 }
 
 fn mark_challenge(resp: HttpResp) -> HttpResp {

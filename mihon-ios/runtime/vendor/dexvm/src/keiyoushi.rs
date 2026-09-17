@@ -599,7 +599,14 @@ impl Keiyoushi {
             JvmError::Resolution("keiyoushi bridge: __host_execute not registered".into())
         })?;
         match f(vm, &[req]) {
-            Ok(v) => Ok(v),
+            Ok(v) => match vm.payload_of(v) {
+                Some(crate::vm::object::Native::Response { code, .. })
+                    if !(200..300).contains(&code) =>
+                {
+                    Err(JvmError::Resolution(format!("HTTP {code}")))
+                }
+                _ => Ok(v),
+            },
             Err(crate::vm::NatErr::Throw(ex)) => Err(JvmError::Uncaught(ex)),
             Err(crate::vm::NatErr::Fatal(e)) => Err(e),
         }

@@ -285,7 +285,10 @@ pub fn decode(insns: &[u16], pc: usize) -> Result<(Insn, usize), DexError> {
         0x1d => Ok((Insn::MonitorEnter(a8), pc + 1)),
         0x1e => Ok((Insn::MonitorExit(a8), pc + 1)),
         0x1f => Ok((Insn::CheckCast(a8, u32::from(w1()?)), pc + 2)),
-        0x20 => Ok((Insn::InstanceOf(a4, b4, u32::from(w1()? & 0xff)), pc + 2)),
+        // 22c: instance-of vA, vB, type@CCCC — CCCC is a full 16-bit type index.
+        // Masking to 8 bits maps CoverArtDto (type id ≥ 256) onto Ld; and
+        // Kotlin `it is T` inlines fail, so MangaDex covers stay empty.
+        0x20 => Ok((Insn::InstanceOf(a4, b4, u32::from(w1()?)), pc + 2)),
         0x21 => Ok((Insn::ArrayLength(a4, b4), pc + 1)),
         0x22 => Ok((Insn::NewInstance(a8, u32::from(w1()?)), pc + 2)),
         0x23 => Ok((Insn::NewArray(a4, b4, u32::from(w1()?)), pc + 2)),
@@ -983,6 +986,20 @@ mod tests {
         assert_eq!(dec(&[0x62 | (2 << 8), 0x100], 0), Insn::SGetObj(2, 0x100));
         assert_eq!(dec(&[0x5a | (1 << 12), 7], 0), Insn::IPutWide(0, 1, 7));
         assert_eq!(dec(&[0x61 | (3 << 8), 0x4], 0), Insn::SGetWide(3, 4));
+    }
+
+    #[test]
+    fn instance_of_uses_16bit_type_index() {
+        // instance-of v0, v1, type@0x010d  (22c: B|A|op CCCC)
+        assert_eq!(
+            dec(&[0x20 | (1 << 12), 0x010d], 0),
+            Insn::InstanceOf(0, 1, 0x010d)
+        );
+        assert_eq!(
+            dec(&[0x20 | (1 << 12), 0x00d], 0),
+            Insn::InstanceOf(0, 1, 0x00d)
+        );
+        assert_eq!(dec(&[0x1f | (2 << 8), 0x010d], 0), Insn::CheckCast(2, 0x010d));
     }
 
     #[test]
