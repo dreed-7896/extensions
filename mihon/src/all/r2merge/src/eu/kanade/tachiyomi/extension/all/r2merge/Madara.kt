@@ -196,8 +196,7 @@ private fun hyphenDecimalSlug(url: String): Float? {
 }
 
 /** `/1.6/` or `/1.6-the-snap/` → 1.6. */
-private fun dottedDecimalSlug(url: String): Float? =
-    SLUG_DOTTED.find(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()
+private fun dottedDecimalSlug(url: String): Float? = SLUG_DOTTED.find(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()
 
 /** `/2/` or `/chapter-2/` → 2. */
 private fun plainNumericSlug(url: String): Float? = SLUG_PLAIN.matchEntire(madaraSlug(url))?.groupValues?.get(1)?.toFloatOrNull()

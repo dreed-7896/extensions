@@ -11,13 +11,13 @@
         "name": "R2 Library",
         "packageName": "eu.kanade.tachiyomi.extension.all.r2merge",
         "resources": {
-          "apkUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/apk/tachiyomi-all.r2merge-v1.4.16.apk",
+          "apkUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/apk/tachiyomi-all.r2merge-v1.4.17.apk",
           "iconUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/icon/eu.kanade.tachiyomi.extension.all.r2merge.png",
-          "jarUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/jar/tachiyomi-all.r2merge-v1.4.16.jar"
+          "jarUrl": "https://raw.githubusercontent.com/raahat-hossain/extensions/cursor/r2-merge-extension-8f4a/repo/jar/tachiyomi-all.r2merge-v1.4.17.jar"
         },
         "extensionLib": "1.4",
-        "versionCode": "16",
-        "versionName": "1.4.16",
+        "versionCode": "17",
+        "versionName": "1.4.17",
         "contentWarning": "CONTENT_WARNING_NSFW",
         "sources": [
           {
