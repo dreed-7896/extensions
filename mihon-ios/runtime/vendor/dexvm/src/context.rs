@@ -637,6 +637,31 @@ impl Context {
         self.last_instance
     }
 
+    /// Construct `class` with a no-arg `<init>` without running GC first, so
+    /// previously created source instances stay alive when a manifest lists
+    /// several `tachiyomi.extension.class` entries.
+    pub fn construct(&mut self, class: &str) -> Result<u32, JvmError> {
+        let class = if class.starts_with('L') && class.ends_with(';') {
+            class.to_string()
+        } else {
+            let trimmed = class.trim_end_matches(';');
+            format!("L{};", trimmed.replace('.', "/"))
+        };
+        let cid = self.vm.ensure_class_by_desc(&class)?;
+        let obj = self.vm.alloc_instance(cid)?;
+        let slot = self.vm.classes[cid as usize]
+            .methods
+            .iter()
+            .position(|m| {
+                self.vm.str_of(m.name) == "<init>"
+                    && (self.vm.str_of(m.sig) == "()V" || m.args.is_empty())
+            })
+            .ok_or_else(|| JvmError::Resolution(format!("no <init>()V in {class}")))?;
+        interpret::run(&mut self.vm, cid, slot as u32, vec![JValue::Obj(obj)])?;
+        self.last_instance = Some(obj);
+        Ok(obj)
+    }
+
     /// Dispatches `method` (by dex name and signature) on a specific object,
     /// resolving through the receiver's vtable including inherited natives.
     ///

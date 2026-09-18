@@ -33,9 +33,22 @@ enum CloudflareSolver {
         return host == domain || host.hasSuffix(".\(domain)") || domain.hasSuffix(host)
     }
 
+    /// Copy WKWebView cookies into `HTTPCookieStorage` (TachiManga McCookieJar).
+    /// NativeNet then retries the same URL with NSURLSession + those cookies.
+    static func exportCookiesBlocking() {
+        let sem = DispatchSemaphore(value: 0)
+        DispatchQueue.main.async {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+                cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
+                sem.signal()
+            }
+        }
+        _ = sem.wait(timeout: .now() + 5)
+    }
+
     /// Called from the engine thread. Presents a WKWebView on the main thread
-    /// so Turnstile/JS challenges can be solved, then keeps that WebView for
-    /// later fetches (same TLS stack as cf_clearance — URLSession 403s after).
+    /// so Turnstile/JS challenges can be solved. Cookies go to HTTPCookieStorage;
+    /// NativeNet retries via URLSession — do not keep using JS fetch() after.
     static func solveBlocking(urlString: String) -> Bool {
         let box = NSMutableArray()
         let sem = DispatchSemaphore(value: 0)

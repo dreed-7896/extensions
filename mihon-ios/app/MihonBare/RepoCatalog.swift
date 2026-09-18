@@ -19,9 +19,21 @@ enum GitHubFallback {
             do {
                 var req = URLRequest(url: url)
                 req.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+                if candidate.lowercased().contains(".apk") {
+                    req.setValue(
+                        "application/vnd.android.package-archive,*/*",
+                        forHTTPHeaderField: "Accept"
+                    )
+                }
                 let (data, resp) = try await URLSession.shared.data(for: req)
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
                 if code == 200, data.count > 32 {
+                    if candidate.lowercased().contains(".apk"),
+                       !(data.count > 1000 && data[0] == 0x50 && data[1] == 0x4B)
+                    {
+                        last = MihonError.message("not an apk \(candidate)")
+                        continue
+                    }
                     return data
                 }
                 last = MihonError.message("HTTP \(code) \(candidate)")

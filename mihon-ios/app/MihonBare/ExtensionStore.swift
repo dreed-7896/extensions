@@ -76,15 +76,23 @@ final class ExtensionStore: ObservableObject {
         for urlString in candidates {
             do {
                 let data = try await GitHubFallback.fetch(urlString)
-                if data.count > 1000 {
+                // GitHub/jsDelivr error HTML is often >1KB; TachiManga validates
+                // the package is an APK (ZIP) before install.
+                if isApk(data) {
                     try data.write(to: dest, options: .atomic)
                     return
                 }
+                last = MihonError.message("not an apk (\(data.count) bytes) \(urlString)")
             } catch {
                 last = error
             }
         }
         throw last
+    }
+
+    private func isApk(_ data: Data) -> Bool {
+        data.count > 1000 && data.count >= 4 && data[0] == 0x50 && data[1] == 0x4B
+    }
     }
 
     private func load() {

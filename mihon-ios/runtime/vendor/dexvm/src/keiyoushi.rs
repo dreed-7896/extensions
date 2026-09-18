@@ -264,39 +264,71 @@ impl Keiyoushi {
         self.ctx.vm()
     }
 
-    /// Instantiates the extension's sources. Two shapes are supported,
-    /// matching what mihon ships across extension generations:
-    /// - modern factories: a class declaring `createSources()` (returning a
-    ///   list, one source per bundled site variation);
-    /// - legacy single-source apks where `ExtensionGenerated` inherits from
-    ///   `HttpSource`/`Source` directly.
+    /// Instantiates the extension's sources the way Mihon/TachiManga/
+    /// Suwayomi `Extension.setupJar` do: `AndroidManifest`
+    /// `tachiyomi.extension.class` (`;`-separated), `newInstance()`, then
+    /// `instanceof SourceFactory` → `createSources()` else `Source`.
+    /// Falls back to scanning the dex when the APK has no meta-data (plain dex).
     pub fn sources(&mut self) -> Result<Vec<Source>, JvmError> {
-        let factory = self.vm().find_factory_class("createSources");
-        if let Ok(desc) = factory {
-            self.ctx.call(&desc, "<init>", &[])?;
-            let list = self.ctx.invoke("createSources", &[])?;
-            let items = match list {
-                JValue::Obj(id) => match &self.vm().arena.objects[id as usize].native {
-                    Some(Native::List(items)) => items.clone(),
-                    _ => return Err(JvmError::Resolution("createSources: bad result".into())),
-                },
-                _ => return Err(JvmError::Resolution("createSources: bad result".into())),
-            };
-            let mut out = Vec::new();
-            for item in items {
-                if let JValue::Obj(o) = item {
-                    out.push(Source { inst: o });
+        if let Ok(manifest) = self.manifest() {
+            let names = resolve_source_classes(&manifest);
+            if !names.is_empty() {
+                let mut out = Vec::new();
+                let mut last_err: Option<JvmError> = None;
+                for name in names {
+                    match self.instantiate_entry(&name) {
+                        Ok(srcs) => out.extend(srcs),
+                        Err(e) => last_err = Some(e),
+                    }
+                }
+                if !out.is_empty() {
+                    return Ok(out);
+                }
+                if let Some(e) = last_err {
+                    return Err(e);
                 }
             }
-            return Ok(out);
+        }
+        let factory = self.vm().find_factory_class("createSources");
+        if let Ok(desc) = factory {
+            return self.instantiate_entry(&desc);
         }
         let desc = self.vm().find_http_source_subclass()?;
-        self.ctx.call(&desc, "<init>", &[])?;
-        let inst = self
+        self.instantiate_entry(&desc)
+    }
+
+    fn instantiate_entry(&mut self, class: &str) -> Result<Vec<Source>, JvmError> {
+        let inst = self.ctx.construct(class)?;
+        if self.is_source_factory(inst)? {
+            let list = self
+                .ctx
+                .invoke_on(inst, "createSources", "()Ljava/util/List;", &[])?;
+            return list_to_sources(self.vm(), list);
+        }
+        // Renamed SourceFactory interfaces still expose createSources().
+        if let Ok(list) = self
             .ctx
-            .last_instance()
-            .ok_or_else(|| JvmError::Resolution(format!("{desc}: no instance after <init>")))?;
+            .invoke_on(inst, "createSources", "()Ljava/util/List;", &[])
+        {
+            if let Ok(srcs) = list_to_sources(self.vm(), list) {
+                if !srcs.is_empty() {
+                    return Ok(srcs);
+                }
+            }
+        }
         Ok(vec![Source { inst }])
+    }
+
+    fn is_source_factory(&mut self, inst: u32) -> Result<bool, JvmError> {
+        let vm = self.vm();
+        let cid = vm
+            .arena
+            .objects
+            .get(inst as usize)
+            .map(|o| o.class)
+            .ok_or_else(|| JvmError::Resolution("construct: missing object".into()))?;
+        let factory = vm.ensure_class_by_desc("Leu/kanade/tachiyomi/source/SourceFactory;")?;
+        vm.is_assignable(cid, factory)
     }
 
     pub fn source_name(&mut self, src: &Source) -> Result<String, JvmError> {
@@ -1147,5 +1179,49 @@ fn empty_chapter(url: String, name: String) -> Native {
         scanlator: String::new(),
         chapter_number: 0.0,
         memo: JValue::Null,
+    }
+}
+
+fn resolve_source_classes(manifest: &AppManifest) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut push = |raw: &str| {
+        for s in raw.split(';').map(str::trim).filter(|s| !s.is_empty()) {
+            let full = if s.starts_with('.') {
+                format!("{}{s}", manifest.package_id)
+            } else {
+                s.to_string()
+            };
+            if !names.iter().any(|n| n == &full) {
+                names.push(full);
+            }
+        }
+    };
+    if let Some(raw) = manifest.source_class.as_deref() {
+        push(raw);
+    }
+    if let Some(raw) = manifest.source_factory.as_deref() {
+        push(raw);
+    }
+    names
+}
+
+fn list_to_sources(vm: &Vm, list: JValue) -> Result<Vec<Source>, JvmError> {
+    match list {
+        JValue::Obj(id) => match vm
+            .arena
+            .objects
+            .get(id as usize)
+            .and_then(|o| o.native.as_ref())
+        {
+            Some(Native::List(items)) => Ok(items
+                .iter()
+                .filter_map(|item| match item {
+                    JValue::Obj(o) => Some(Source { inst: *o }),
+                    _ => None,
+                })
+                .collect()),
+            _ => Err(JvmError::Resolution("createSources: bad result".into())),
+        },
+        _ => Err(JvmError::Resolution("createSources: bad result".into())),
     }
 }

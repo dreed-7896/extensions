@@ -29,47 +29,34 @@ enum HostHTTP {
             return strdupJson(fail(0, "bad request"))
         }
 
-        var result: EngineResp
-        let host = url.host
-        let useWeb = host.map { CloudflareSolver.usesWeb($0) || CloudflareSolver.hasClearance(for: $0) } ?? false
-        if useWeb,
-           let web = CloudflareSolver.fetchBlocking(
-            method: req.method,
-            url: url,
-            headers: req.headers,
-            body: req.body
-           )
-        {
-            result = EngineResp(
-                code: web.code,
-                message: web.message,
-                headers: web.headers,
-                bodyB64: web.bodyB64
-            )
-        } else {
-            result = fetch(req, url: url)
-        }
+        var result = fetch(req, url: url)
+        // TachiManga NativeNet: NSURLSession for every request. WKWebView is
+        // only the CF solver (McCookieJar copies cf_clearance, then retry).
+        // JS fetch() is CORS-bound to the solved origin and breaks api/cdn.
         if isCloudflare(result) {
             let solved = CloudflareSolver.solveBlocking(urlString: req.url)
             if solved {
-                if let web = CloudflareSolver.fetchBlocking(
+                CloudflareSolver.exportCookiesBlocking()
+                result = fetch(req, url: url)
+                if isCloudflare(result) {
+                    Thread.sleep(forTimeInterval: 0.4)
+                    CloudflareSolver.exportCookiesBlocking()
+                    result = fetch(req, url: url)
+                }
+                if isCloudflare(result),
+                   let web = CloudflareSolver.fetchBlocking(
                     method: req.method,
                     url: url,
                     headers: req.headers,
                     body: req.body
-                ) {
+                   )
+                {
                     result = EngineResp(
                         code: web.code,
                         message: web.message,
                         headers: web.headers,
                         bodyB64: web.bodyB64
                     )
-                } else {
-                    result = fetch(req, url: url)
-                    if isCloudflare(result) {
-                        Thread.sleep(forTimeInterval: 0.4)
-                        result = fetch(req, url: url)
-                    }
                 }
             }
             if isCloudflare(result) {
@@ -115,8 +102,9 @@ enum HostHTTP {
         return out
     }
 
-    /// Merge URLSession cookies on top of any Cookie header the extension set.
-    /// Last-wins per name so `cf_clearance` from WKWebView replaces a stale jar.
+    /// TachiManga `McCookieJar.directLoadForRequest`: merge every cookie
+    /// whose domain matches the host (parent domains included). Last-wins
+    /// per name so `cf_clearance` from WKWebView replaces a stale jar.
     private static func applyCookies(_ request: inout URLRequest, url: URL) {
         var parts: [(String, String)] = []
         let put = { (raw: String) in
@@ -135,7 +123,11 @@ enum HostHTTP {
         if let existing = request.value(forHTTPHeaderField: "Cookie") {
             put(existing)
         }
-        if let cookies = HTTPCookieStorage.shared.cookies(for: url), !cookies.isEmpty {
+        let host = url.host ?? ""
+        let cookies = (HTTPCookieStorage.shared.cookies ?? []).filter {
+            CloudflareSolver.domainMatches($0.domain, host: host)
+        }
+        if !cookies.isEmpty {
             put(cookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; "))
         }
         if parts.isEmpty { return }

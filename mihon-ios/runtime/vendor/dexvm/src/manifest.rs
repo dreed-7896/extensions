@@ -34,6 +34,16 @@ pub struct AppManifest {
     /// [`ResourceTable::path`] and to the icon file with
     /// [`crate::Context::icon_bytes`].
     pub icon_resource_id: Option<u32>,
+    /// `uses-feature android:name="tachiyomi.extension"`.
+    pub is_extension: bool,
+    /// Raw `tachiyomi.extension.class` meta-data (`;`-separated, `.Foo` relative).
+    pub source_class: Option<String>,
+    /// `tachiyomi.extension.factory` meta-data, when present.
+    pub source_factory: Option<String>,
+    /// `tachiyomix.extensionLib` (e.g. `"1.4"` / `"1.6"`).
+    pub extension_lib: Option<String>,
+    /// `tachiyomi.extension.nsfw` == 1.
+    pub nsfw: bool,
 }
 
 /// Errors produced while parsing an APK's manifest or resource table.
@@ -301,6 +311,11 @@ pub fn parse_manifest(
         min_sdk: None,
         target_sdk: None,
         icon_resource_id: None,
+        is_extension: false,
+        source_class: None,
+        source_factory: None,
+        extension_lib: None,
+        nsfw: false,
     };
     let mut off = 8usize;
     while off + 8 <= data.len() {
@@ -324,6 +339,9 @@ pub fn parse_manifest(
                 stack.push(el_name.clone());
                 let mut label: Option<AttrValue> = None;
                 let mut icon: Option<AttrValue> = None;
+                let mut md_name: Option<String> = None;
+                let mut md_value: Option<String> = None;
+                let mut md_int: Option<i32> = None;
                 for i in 0..attr_count {
                     let a = off + 16 + attr_start + i * attr_size;
                     if a + 20 > end {
@@ -373,8 +391,38 @@ pub fn parse_manifest(
                             }
                             _ => {}
                         },
+                        "uses-feature" => {
+                            if name.as_deref() == Some("name") {
+                                if let AttrValue::Str(s) = &value {
+                                    if s == "tachiyomi.extension" {
+                                        manifest.is_extension = true;
+                                    }
+                                }
+                            }
+                        }
+                        "meta-data" => match name.as_deref() {
+                            Some("name") => {
+                                if let AttrValue::Str(s) = value {
+                                    md_name = Some(s);
+                                }
+                            }
+                            Some("value") => match value {
+                                AttrValue::Str(s) => md_value = Some(s),
+                                AttrValue::Int(v) => md_int = Some(v),
+                                _ => {}
+                            },
+                            _ => {}
+                        },
                         _ => {}
                     }
+                }
+                if el_name == "meta-data" {
+                    apply_meta(
+                        &mut manifest,
+                        md_name.as_deref(),
+                        md_value.as_deref(),
+                        md_int,
+                    );
                 }
                 if let Some(AttrValue::Ref(id)) = icon {
                     manifest.icon_resource_id = Some(id);
@@ -405,6 +453,42 @@ pub fn parse_manifest(
         manifest.app_name = manifest.package_id.clone();
     }
     Ok(manifest)
+}
+
+fn apply_meta(manifest: &mut AppManifest, name: Option<&str>, value: Option<&str>, int: Option<i32>) {
+    let Some(name) = name else { return };
+    match name {
+        "tachiyomi.extension.class" => {
+            if let Some(v) = value {
+                manifest.source_class = Some(v.to_string());
+            }
+        }
+        "tachiyomi.extension.factory" => {
+            if let Some(v) = value {
+                manifest.source_factory = Some(v.to_string());
+            }
+        }
+        "tachiyomix.extensionLib" => {
+            if let Some(v) = value {
+                manifest.extension_lib = Some(v.to_string());
+            }
+        }
+        "tachiyomi.extension.nsfw" => {
+            manifest.nsfw = match (value, int) {
+                (Some("1" | "true" | "TRUE"), _) => true,
+                (_, Some(1)) => true,
+                _ => false,
+            };
+        }
+        "tachiyomix.name" => {
+            if manifest.app_name.is_empty() {
+                if let Some(v) = value {
+                    manifest.app_name = v.to_string();
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 /// A typed manifest attribute value.
@@ -536,6 +620,7 @@ fn attr_name(strings: &[String], raw: u32) -> Option<String> {
             0x0101_0001 => Some("label".into()),
             0x0101_0002 => Some("icon".into()),
             0x0101_0003 => Some("name".into()),
+            0x0101_0024 => Some("value".into()),
             0x0101_021b => Some("versionName".into()),
             0x0101_020c => Some("minSdkVersion".into()),
             0x0101_0270 => Some("targetSdkVersion".into()),
