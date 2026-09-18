@@ -119,7 +119,7 @@ struct RepoView: View {
             for repo in MihonConfig.repos {
                 group.addTask {
                     do {
-                        let (data, _) = try await URLSession.shared.data(from: repo.index)
+                        let data = try await GitHubFallback.fetch(repo.index.absoluteString)
                         return (repo.id, .success(RepoCatalog.parse(data).map { $0.tagged(repo: repo) }))
                     } catch {
                         return (repo.id, .failure(error))

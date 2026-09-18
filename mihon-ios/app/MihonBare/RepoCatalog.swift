@@ -1,6 +1,58 @@
 import Foundation
 import zlib
 
+/// TachiManga/Suwayomi `JsDelivrFallback`: GitHub raw often 403s, so retry
+/// `raw.githubusercontent.com` / `github.com/.../raw/` via jsDelivr.
+enum GitHubFallback {
+    static func urls(_ original: String) -> [String] {
+        var out = [original]
+        if let alt = jsDelivr(original), alt != original {
+            out.append(alt)
+        }
+        return out
+    }
+
+    static func fetch(_ urlString: String) async throws -> Data {
+        var last: Error = MihonError.message("fetch failed")
+        for candidate in urls(urlString) {
+            guard let url = URL(string: candidate) else { continue }
+            do {
+                var req = URLRequest(url: url)
+                req.setValue(MihonConfig.userAgent, forHTTPHeaderField: "User-Agent")
+                let (data, resp) = try await URLSession.shared.data(for: req)
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                if code == 200, data.count > 32 {
+                    return data
+                }
+                last = MihonError.message("HTTP \(code) \(candidate)")
+            } catch {
+                last = error
+            }
+        }
+        throw last
+    }
+
+    private static func jsDelivr(_ url: String) -> String? {
+        let rawPrefix = "https://raw.githubusercontent.com/"
+        if url.hasPrefix(rawPrefix) {
+            let parts = String(url.dropFirst(rawPrefix.count))
+                .split(separator: "/", maxSplits: 3, omittingEmptySubsequences: false)
+                .map(String.init)
+            guard parts.count == 4 else { return nil }
+            return "https://cdn.jsdelivr.net/gh/\(parts[0])/\(parts[1])@\(parts[2])/\(parts[3])"
+        }
+        let ghPrefix = "https://github.com/"
+        if url.hasPrefix(ghPrefix) {
+            let parts = String(url.dropFirst(ghPrefix.count))
+                .split(separator: "/", maxSplits: 4, omittingEmptySubsequences: false)
+                .map(String.init)
+            guard parts.count == 5, parts[2] == "raw" else { return nil }
+            return "https://cdn.jsdelivr.net/gh/\(parts[0])/\(parts[1])@\(parts[3])/\(parts[4])"
+        }
+        return nil
+    }
+}
+
 enum RepoCatalog {
     static func parse(_ data: Data) -> [RepoExtension] {
         if let list = parseJSON(data), !list.isEmpty, !isStub(list) {

@@ -74,10 +74,9 @@ final class ExtensionStore: ObservableObject {
         ])
         var last: Error = MihonError.message("no apk url worked")
         for urlString in candidates {
-            guard let url = URL(string: urlString) else { continue }
             do {
-                let (data, resp) = try await URLSession.shared.data(from: url)
-                if let http = resp as? HTTPURLResponse, http.statusCode == 200, data.count > 1000 {
+                let data = try await GitHubFallback.fetch(urlString)
+                if data.count > 1000 {
                     try data.write(to: dest, options: .atomic)
                     return
                 }
