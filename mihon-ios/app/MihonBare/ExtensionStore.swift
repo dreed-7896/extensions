@@ -91,8 +91,7 @@ final class ExtensionStore: ObservableObject {
     }
 
     private func isApk(_ data: Data) -> Bool {
-        data.count > 1000 && data.count >= 4 && data[0] == 0x50 && data[1] == 0x4B
-    }
+        data.count > 1000 && data.starts(with: [0x50, 0x4B])
     }
 
     private func load() {

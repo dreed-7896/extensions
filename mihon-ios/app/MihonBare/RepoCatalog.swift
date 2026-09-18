@@ -29,7 +29,7 @@ enum GitHubFallback {
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
                 if code == 200, data.count > 32 {
                     if candidate.lowercased().contains(".apk"),
-                       !(data.count > 1000 && data[0] == 0x50 && data[1] == 0x4B)
+                       !(data.count > 1000 && data.starts(with: [0x50, 0x4B]))
                     {
                         last = MihonError.message("not an apk \(candidate)")
                         continue
