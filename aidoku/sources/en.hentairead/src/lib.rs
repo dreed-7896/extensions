@@ -7,7 +7,7 @@ use aidoku::{
 	prelude::*,
 	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
-	PageContent, Result, Source, UpdateStrategy,
+	PageContent, PageContext, Result, Source, UpdateStrategy,
 };
 use base64::{engine::general_purpose::{STANDARD, URL_SAFE}, Engine as _};
 use midoku_madara::is_blocked;
@@ -31,7 +31,10 @@ impl HentaiRead {
 	fn image_url(element: &aidoku::imports::html::Element) -> Option<String> {
 		for key in ["data-src", "data-lazy-src", "data-cfsrc"] {
 			if let Some(value) = element.attr(key).filter(|value| !value.trim().is_empty()) {
-				return Some(Self::absolute_url(value.trim()));
+				let value = value.trim();
+				if !Self::is_placeholder(value) {
+					return Some(Self::absolute_url(value));
+				}
 			}
 		}
 		if let Some(srcset) = element.attr("srcset") {
@@ -42,18 +45,28 @@ impl HentaiRead {
 		element
 			.attr("abs:src")
 			.or_else(|| element.attr("src"))
+			.filter(|value| !Self::is_placeholder(value))
 			.map(|value| Self::absolute_url(value.trim()))
 	}
 
-	fn parse_list(document: &aidoku::imports::html::Document) -> MangaPageResult {
-		let entries = document
-			.select(".manga-item, div.page-item-detail, .c-tabs-item__content")
+	fn is_placeholder(value: &str) -> bool {
+		let value = value.to_ascii_lowercase();
+		value.is_empty()
+			|| value.contains("placeholder")
+			|| value.contains("blank.")
+			|| value.contains("spacer")
+			|| value.contains("spinner")
+			|| value.contains("logo")
+			|| value.contains("avatar")
+	}
+
+	fn parse_list(document: &aidoku::imports::html::Document) -> Result<MangaPageResult> {
+		let entries: Vec<Manga> = document
+			.select("div.manga-item")
 			.map(|elements| {
 				elements
 					.filter_map(|element| {
-						let link = element.select_first(
-							"a.manga-item__link, .post-title a, h3 a, h2 a",
-						)?;
+						let link = element.select_first("h3 a[href*='/hentai/']")?;
 						let title = link
 							.attr("title")
 							.filter(|title| !title.trim().is_empty())
@@ -64,7 +77,9 @@ impl HentaiRead {
 							return None;
 						}
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
-						let cover = element.select_first("img").and_then(|image| Self::image_url(&image));
+						let cover = element
+							.select_first("img.manga-item__img-inner, img")
+							.and_then(|image| Self::image_url(&image));
 						let absolute_url = Self::absolute_url(&href);
 						Some(Manga {
 							key: absolute_url
@@ -83,7 +98,10 @@ impl HentaiRead {
 		let has_next_page = document
 			.select_first("a[rel=next], div.nav-previous, a.nextpostslink")
 			.is_some();
-		MangaPageResult { entries, has_next_page }
+		if entries.is_empty() {
+			bail!("HentaiRead returned no titles. If a Cloudflare challenge is visible, complete it and retry.");
+		}
+		Ok(MangaPageResult { entries, has_next_page })
 	}
 
 	fn browse(order: &str, page: i32) -> Result<MangaPageResult> {
@@ -92,9 +110,7 @@ impl HentaiRead {
 		} else {
 			"/hentai/".into()
 		};
-		Ok(Self::parse_list(
-			&Request::get(format!("{BASE_URL}{path}?sortby={order}"))?.html()?,
-		))
+		Self::parse_list(&Request::get(format!("{BASE_URL}{path}?sortby={order}"))?.html()?)
 	}
 
 	fn text_list(document: &aidoku::imports::html::Document, selector: &str) -> Option<Vec<String>> {
@@ -117,6 +133,104 @@ impl HentaiRead {
 			.map(|(index, _)| index)
 			.unwrap_or(tail.len());
 		Some(&tail[..end])
+	}
+
+	fn script_text(element: aidoku::imports::html::Element) -> Option<String> {
+		element.data().or_else(|| element.html())
+	}
+
+	fn parse_base_url(script: &str) -> String {
+		if let (Some(start), Some(end)) = (script.find('{'), script.rfind('}')) {
+			if start <= end {
+				if let Ok(value) = serde_json::from_str::<Value>(&script[start..=end]) {
+					if let Some(url) = value.get("baseUrl").and_then(Value::as_str) {
+						return url.into();
+					}
+				}
+			}
+		}
+		for key in ["\"baseUrl\"", "'baseUrl'"] {
+			if let Some(value) = script.split_once(key).map(|(_, value)| value) {
+				let value = value.trim_start_matches(|ch: char| ch.is_whitespace() || ch == ':');
+				if let Some(quote) = value.chars().next().filter(|ch| *ch == '\'' || *ch == '\"') {
+					if let Some(end) = value[1..].find(quote) {
+						return value[1..=end].into();
+					}
+				}
+			}
+		}
+		String::new()
+	}
+
+	fn page_content(url: String, referer: &str) -> PageContent {
+		let mut context = PageContext::new();
+		context.insert("referer".into(), referer.into());
+		PageContent::url_context(url, context)
+	}
+
+	fn parse_reader_pages(
+		document: &aidoku::imports::html::Document,
+		reader_url: &str,
+	) -> Vec<Page> {
+		let page_base = document
+			.select_first("#single-chapter-js-extra")
+			.and_then(Self::script_text)
+			.map(|script| Self::parse_base_url(&script))
+			.unwrap_or_default();
+
+		let mut pages = Vec::new();
+		if let Some(mut encoded) = document
+			.select_first("#single-chapter-js-before")
+			.and_then(Self::script_text)
+			.and_then(|script| Self::extract_base64(&script).map(String::from))
+		{
+			while encoded.len() % 4 != 0 {
+				encoded.push('=');
+			}
+			if let Ok(decoded) = STANDARD
+				.decode(encoded.as_bytes())
+				.or_else(|_| URL_SAFE.decode(encoded.as_bytes()))
+			{
+				if let Ok(value) = serde_json::from_slice::<Value>(&decoded) {
+					if let Some(images) = value.pointer("/data/chapter/images").and_then(Value::as_array) {
+						pages = images
+							.iter()
+							.filter_map(|image| image.get("src").and_then(Value::as_str))
+							.filter(|path| !Self::is_placeholder(path))
+							.map(|path| {
+								let url = if path.starts_with("http://") || path.starts_with("https://") {
+									path.into()
+								} else if page_base.is_empty() {
+									Self::absolute_url(path)
+								} else {
+									format!("{}/{}", page_base.trim_end_matches('/'), path.trim_start_matches('/'))
+								};
+								Page {
+									content: Self::page_content(url, reader_url),
+									..Default::default()
+								}
+							})
+							.collect();
+					}
+				}
+			}
+		}
+
+		if pages.is_empty() {
+			pages = document
+				.select(".reading-content img, .page-break img, img.wp-manga-chapter-img")
+				.map(|elements| {
+					elements
+						.filter_map(|element| Self::image_url(&element))
+						.map(|url| Page {
+							content: Self::page_content(url, reader_url),
+							..Default::default()
+						})
+						.collect()
+				})
+				.unwrap_or_default();
+		}
+		pages
 	}
 }
 
@@ -145,9 +259,7 @@ impl Source for HentaiRead {
 		let mut params = QueryParameters::new();
 		params.push("s", Some(&query));
 		params.push("title-type", Some("contains"));
-		Ok(Self::parse_list(
-			&Request::get(format!("{BASE_URL}{path}?{params}"))?.html()?,
-		))
+		Self::parse_list(&Request::get(format!("{BASE_URL}{path}?{params}"))?.html()?)
 	}
 
 	fn get_manga_update(
@@ -163,8 +275,14 @@ impl Source for HentaiRead {
 			.and_then(|element| element.text())
 			.unwrap_or(manga.title);
 		manga.cover = document
-			.select_first("div.summary_image img, .manga-thumb img")
-			.and_then(|image| Self::image_url(&image))
+			.select_first("meta[name='twitter:image']")
+			.and_then(|element| element.attr("content"))
+			.map(|value| Self::absolute_url(value.trim()))
+			.or_else(|| {
+				document
+					.select_first("img[fetchpriority='high'], div.summary_image img, .manga-thumb img")
+					.and_then(|image| Self::image_url(&image))
+			})
 			.or(manga.cover);
 		manga.authors = Self::text_list(&document, "a[href*='/circle/'] span:first-of-type");
 		manga.artists = Self::text_list(&document, "a[href*='/artist/'] span:first-of-type");
@@ -190,121 +308,67 @@ impl Source for HentaiRead {
 		}
 
 		if needs_chapters {
-			let mut chapters = document
-				.select("a[href*='/p/1/'], a[href$='/english/'], a[href$='/japanese/'], a[href$='/chinese/']")
-				.map(|elements| {
-					elements
-						.filter_map(|element| {
-							let href = element.attr("abs:href").or_else(|| element.attr("href"))?;
-							let mut reader_url = Self::absolute_url(&href);
-							if !reader_url.contains("/p/") {
-								reader_url = format!("{}/p/1/", reader_url.trim_end_matches('/'));
-							}
-							let lower = reader_url.to_ascii_lowercase();
-							let (label, language) = if lower.contains("/english/") {
-								("English", "en")
-							} else if lower.contains("/japanese/") {
-								("Japanese", "ja")
-							} else if lower.contains("/chinese/") {
-								("Chinese", "zh")
-							} else {
-								("Chapter", "en")
-							};
-							Some(Chapter {
-								key: reader_url.clone(),
-								title: Some(label.into()),
-								url: Some(reader_url),
-								language: Some(language.into()),
-								..Default::default()
-							})
-						})
-						.fold(Vec::new(), |mut chapters, chapter| {
-							if !chapters.iter().any(|existing: &Chapter| existing.key == chapter.key) {
-								chapters.push(chapter);
-							}
-							chapters
-						})
-				})
-				.unwrap_or_default();
-			if chapters.is_empty() {
-				let reader_url = format!("{}/english/p/1/", url.trim_end_matches('/'));
-				chapters.push(Chapter {
-					key: reader_url.clone(),
-					title: Some("English".into()),
-					chapter_number: Some(1.0),
-					url: Some(reader_url),
-					language: Some("en".into()),
-					..Default::default()
-				});
-			}
-			manga.chapters = Some(chapters);
+			manga.chapters = Some(vec![Chapter {
+				key: manga.key.clone(),
+				title: Some("Chapter".into()),
+				chapter_number: Some(1.0),
+				url: Some(url),
+				language: Some("en".into()),
+				..Default::default()
+			}]);
 		}
 		Ok(manga)
 	}
 
 	fn get_page_list(&self, manga: Manga, chapter: Chapter) -> Result<Vec<Page>> {
 		let manga_url = Self::absolute_url(&manga.key);
-		let reader_url = if chapter.key.contains("/p/") {
-			Self::absolute_url(&chapter.key)
-		} else {
-			format!("{}/english/p/1/", manga_url.trim_end_matches('/'))
-		};
-		let document = Request::get(&reader_url)?.html()?;
+		let mut reader_urls = Vec::new();
+		if chapter.key.contains("/p/") || chapter.key.contains("/english/") {
+			reader_urls.push(Self::absolute_url(&chapter.key));
+		}
 
-		let page_base = document
-			.select_first("#single-chapter-js-extra")
-			.and_then(|element| element.data())
-			.and_then(|script| {
-				let start = script.find('{')?;
-				let end = script[start..].find('}')? + start;
-				serde_json::from_str::<Value>(&script[start..=end]).ok()
-			})
-			.and_then(|value| value.get("baseUrl").and_then(Value::as_str).map(String::from))
-			.unwrap_or_default();
-
-		let mut pages = Vec::new();
-		if let Some(mut encoded) = document
-			.select_first("#single-chapter-js-before")
-			.and_then(|element| element.data())
-			.and_then(|script| Self::extract_base64(&script).map(String::from))
+		if let Ok(document) = Request::get(&manga_url)
+			.map(|request| request.header("Referer", BASE_URL))
+			.and_then(|request| request.html())
 		{
-			while encoded.len() % 4 != 0 {
-				encoded.push('=');
-			}
-			if let Ok(decoded) = STANDARD.decode(encoded.as_bytes()).or_else(|_| URL_SAFE.decode(encoded.as_bytes())) {
-				if let Ok(value) = serde_json::from_slice::<Value>(&decoded) {
-					if let Some(images) = value.pointer("/data/chapter/images").and_then(Value::as_array) {
-						pages = images
-							.iter()
-							.filter_map(|image| image.get("src").and_then(Value::as_str))
-							.map(|path| {
-								let url = if page_base.is_empty() {
-									Self::absolute_url(path)
-								} else {
-									format!("{}/{}", page_base.trim_end_matches('/'), path.trim_start_matches('/'))
-								};
-								Page { content: PageContent::url(url), ..Default::default() }
-							})
-							.collect();
+			if let Some(elements) = document.select("a[href*='/english/']") {
+				for element in elements {
+					if let Some(href) = element.attr("abs:href").or_else(|| element.attr("href")) {
+						let mut url = Self::absolute_url(&href);
+						if !url.contains("/p/") {
+							url = format!("{}/p/1/", url.trim_end_matches('/'));
+						}
+						if !reader_urls.iter().any(|candidate| candidate == &url) {
+							reader_urls.push(url);
+						}
 					}
 				}
 			}
 		}
-		if pages.is_empty() {
-			pages = document
-				.select(".reading-content img, .page-break img, img.wp-manga-chapter-img")
-				.map(|elements| {
-					elements
-						.filter_map(|element| Self::image_url(&element))
-						.map(|url| Page { content: PageContent::url(url), ..Default::default() })
-						.collect()
-				})
-				.unwrap_or_default();
+
+		for url in [
+			format!("{}/english/p/1/", manga_url.trim_end_matches('/')),
+			format!("{}/english/", manga_url.trim_end_matches('/')),
+		] {
+			if !reader_urls.iter().any(|candidate| candidate == &url) {
+				reader_urls.push(url);
+			}
 		}
-		if pages.is_empty() {
-			bail!("No readable pages were returned.");
+
+		for reader_url in reader_urls {
+			let Ok(document) = Request::get(&reader_url)
+				.map(|request| request.header("Referer", manga_url.as_str()))
+				.and_then(|request| request.html())
+			else {
+				continue;
+			};
+			let pages = Self::parse_reader_pages(&document, &reader_url);
+			if !pages.is_empty() {
+				return Ok(pages);
+			}
 		}
-		Ok(pages)
+
+		bail!("No readable pages were returned from the English reader.")
 	}
 }
 
@@ -312,7 +376,7 @@ impl ListingProvider for HentaiRead {
 	fn get_manga_list(&self, listing: Listing, page: i32) -> Result<MangaPageResult> {
 		match listing.id.as_str() {
 			"popular" => Self::browse("views", page),
-			"latest" => Self::browse("new", page),
+			"latest" | "recent" => Self::browse("new", page),
 			_ => bail!("Unknown listing"),
 		}
 	}
@@ -331,10 +395,15 @@ impl ImageRequestProvider for HentaiRead {
 	fn get_image_request(
 		&self,
 		url: String,
-		_context: Option<aidoku::PageContext>,
+		context: Option<aidoku::PageContext>,
 	) -> Result<Request> {
+		let referer = context
+			.as_ref()
+			.and_then(|context| context.get("referer"))
+			.map(String::as_str)
+			.unwrap_or(BASE_URL);
 		Ok(Request::get(url)?
-			.header("Referer", BASE_URL)
+			.header("Referer", referer)
 			.header("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"))
 	}
 }

@@ -53,14 +53,15 @@
     {
       "id": "en.hentairead",
       "name": "HentaiRead",
-      "version": 2,
-      "iconURL": "icons/en.hentairead-v2.png",
-      "downloadURL": "sources/en.hentairead-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.hentairead-v3.png",
+      "downloadURL": "sources/en.hentairead-v3.aix",
       "languages": [
         "en"
       ],
       "contentRating": 2,
-      "baseURL": "https://hentairead.com"
+      "baseURL": "https://hentairead.com",
+      "minAppVersion": "0.7"
     },
     {
       "id": "en.hiperdex",
@@ -77,14 +78,15 @@
     {
       "id": "en.novelcrow",
       "name": "NovelCrow",
-      "version": 2,
-      "iconURL": "icons/en.novelcrow-v2.png",
-      "downloadURL": "sources/en.novelcrow-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.novelcrow-v3.png",
+      "downloadURL": "sources/en.novelcrow-v3.aix",
       "languages": [
         "en"
       ],
       "contentRating": 2,
-      "baseURL": "https://novelcrow.com"
+      "baseURL": "https://novelcrow.com",
+      "minAppVersion": "0.7"
     },
     {
       "id": "en.omegascans",

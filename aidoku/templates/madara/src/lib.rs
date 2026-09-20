@@ -290,7 +290,7 @@ impl<I: Impl> ListingProvider for Madara<I> {
 	fn get_manga_list(&self, listing: Listing, page: i32) -> Result<MangaPageResult> {
 		match listing.id.as_str() {
 			"popular" => self.browse(self.params().popular_order, page, None),
-			"latest" => self.browse(self.params().latest_order, page, None),
+			"latest" | "recent" => self.browse(self.params().latest_order, page, None),
 			_ => bail!("Unknown listing"),
 		}
 	}
