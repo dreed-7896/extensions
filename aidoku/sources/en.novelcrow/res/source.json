@@ -2,7 +2,7 @@
 	"info": {
 		"id": "en.novelcrow",
 		"name": "NovelCrow",
-		"version": 3,
+		"version": 4,
 		"url": "https://novelcrow.com",
 		"contentRating": 2,
 		"languages": ["en"],
