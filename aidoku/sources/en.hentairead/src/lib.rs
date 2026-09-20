@@ -1,7 +1,13 @@
 #![no_std]
 
 use aidoku::{
-	alloc::{borrow::ToOwned, format, string::String, vec, vec::Vec},
+	alloc::{
+		borrow::ToOwned,
+		format,
+		string::{String, ToString},
+		vec,
+		vec::Vec,
+	},
 	helpers::uri::QueryParameters,
 	imports::net::Request,
 	prelude::*,
@@ -111,6 +117,151 @@ impl HentaiRead {
 			"/hentai/".into()
 		};
 		Self::parse_list(&Request::get(format!("{BASE_URL}{path}?sortby={order}"))?.html()?)
+	}
+
+	fn get_term_id(term: &str, taxonomy: &str) -> Result<String> {
+		let taxonomy = if taxonomy == "artist" { "manga_artist" } else { taxonomy };
+		let mut params = QueryParameters::new();
+		params.push("action", Some("search_manga_terms"));
+		params.push("search", Some(term));
+		params.push("taxonomy", Some(taxonomy));
+		let body = Request::get(format!("{BASE_URL}/wp-admin/admin-ajax.php?{params}"))?.string()?;
+		let value: Value = serde_json::from_str(&body)
+			.map_err(|_| aidoku::AidokuError::message("Invalid filter response"))?;
+		let item = value
+			.get("results")
+			.and_then(Value::as_array)
+			.and_then(|items| {
+				items.iter().find(|item| {
+					item.get("text")
+						.and_then(Value::as_str)
+						.map(|text| text.eq_ignore_ascii_case(term))
+						.unwrap_or(false)
+				})
+			});
+		let Some(id) = item.and_then(|item| item.get("id")) else {
+			bail!("Filter value not found: {term}");
+		};
+		if let Some(id) = id.as_i64() {
+			Ok(id.to_string())
+		} else if let Some(id) = id.as_str() {
+			Ok(id.to_owned())
+		} else {
+			bail!("Invalid filter value: {term}")
+		}
+	}
+
+	fn add_term_filters(
+		params: &mut QueryParameters,
+		value: &str,
+		taxonomy: &str,
+		include_key: &str,
+		exclude_key: Option<&str>,
+	) -> Result<()> {
+		for term in value.split(',').map(str::trim).filter(|term| !term.is_empty()) {
+			let excluded = term.starts_with('-');
+			let term = term.trim_start_matches('-').trim();
+			if term.is_empty() {
+				continue;
+			}
+			let id = Self::get_term_id(term, taxonomy)?;
+			let key = if excluded { exclude_key.unwrap_or(include_key) } else { include_key };
+			params.push(key, Some(&id));
+		}
+		Ok(())
+	}
+
+	fn parse_page_range(value: &str) -> Option<(i32, i32)> {
+		let number = value
+			.chars()
+			.filter(|character| character.is_ascii_digit())
+			.collect::<String>()
+			.parse::<i32>()
+			.ok()?
+			.clamp(1, 9999);
+		let value = value.trim();
+		if value.starts_with("<=") || value.starts_with("=<") {
+			Some((1, number))
+		} else if value.starts_with('<') {
+			Some((1, (number - 1).max(1)))
+		} else if value.starts_with(">=") || value.starts_with("=>") {
+			Some((number, 9999))
+		} else if value.starts_with('>') {
+			Some(((number + 1).min(9999), 9999))
+		} else {
+			Some((number, number))
+		}
+	}
+
+	fn search_url(query: Option<String>, page: i32, filters: Vec<FilterValue>) -> Result<String> {
+		let mut params = QueryParameters::new();
+		if let Some(query) = query.map(|query| query.trim().to_owned()).filter(|query| !query.is_empty()) {
+			if is_blocked(&query) {
+				bail!("This search term is not supported.");
+			}
+			params.push("s", Some(&query));
+		} else {
+			params.push("s", Some(""));
+		}
+		params.push("title-type", Some("contains"));
+
+		for filter in filters {
+			match filter {
+				FilterValue::Sort { id, index, ascending } if id == "sort" => {
+					let sort = match index {
+						1 => "alphabet",
+						2 => "rating",
+						3 => "views",
+						_ => "new",
+					};
+					params.push("sortby", Some(sort));
+					params.push("order", Some(if ascending { "asc" } else { "desc" }));
+				}
+				FilterValue::MultiSelect { id, included, .. } if id == "types" => {
+					for value in included {
+						params.push("categories[]", Some(&value));
+					}
+				}
+				FilterValue::Text { id, value } if !value.trim().is_empty() => match id.as_str() {
+					"tags" => Self::add_term_filters(
+						&mut params,
+						&value,
+						"manga_tag",
+						"including[]",
+						Some("excluding[]"),
+					)?,
+					"artists" => Self::add_term_filters(&mut params, &value, "artist", "artists[]", None)?,
+					"circles" => Self::add_term_filters(&mut params, &value, "circle", "circles[]", None)?,
+					"characters" => Self::add_term_filters(&mut params, &value, "character", "characters[]", None)?,
+					"collections" => Self::add_term_filters(&mut params, &value, "collection", "collections[]", None)?,
+					"scanlators" => Self::add_term_filters(&mut params, &value, "scanlator", "scanlators[]", None)?,
+					"conventions" => Self::add_term_filters(&mut params, &value, "convention", "conventions[]", None)?,
+					"uploaded" => {
+						let release = value.chars().filter(|character| character.is_ascii_digit()).collect::<String>();
+						if !release.is_empty() {
+							let release_type = if value.trim().starts_with('>') {
+								"after"
+							} else if value.trim().starts_with('<') {
+								"before"
+							} else {
+								"in"
+							};
+							params.push("release-type", Some(release_type));
+							params.push("release", Some(&release));
+						}
+					}
+					"pages" => {
+						if let Some((minimum, maximum)) = Self::parse_page_range(&value) {
+							params.push("pages", Some(&format!("{minimum}-{maximum}")));
+						}
+					}
+					_ => {}
+				},
+				_ => {}
+			}
+		}
+
+		Ok(format!("{BASE_URL}/page/{}/?{params}", page.max(1)))
 	}
 
 	fn text_list(document: &aidoku::imports::html::Document, selector: &str) -> Option<Vec<String>> {
@@ -243,23 +394,9 @@ impl Source for HentaiRead {
 		&self,
 		query: Option<String>,
 		page: i32,
-		_filters: Vec<FilterValue>,
+		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
-		let Some(query) = query.filter(|query| !query.trim().is_empty()) else {
-			return Self::browse("new", page);
-		};
-		if is_blocked(&query) {
-			bail!("This search term is not supported.");
-		}
-		let path = if page > 1 {
-			format!("/page/{page}/")
-		} else {
-			"/".into()
-		};
-		let mut params = QueryParameters::new();
-		params.push("s", Some(&query));
-		params.push("title-type", Some("contains"));
-		Self::parse_list(&Request::get(format!("{BASE_URL}{path}?{params}"))?.html()?)
+		Self::parse_list(&Request::get(Self::search_url(query, page, filters)?)?.html()?)
 	}
 
 	fn get_manga_update(

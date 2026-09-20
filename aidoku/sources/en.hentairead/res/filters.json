@@ -4,6 +4,84 @@
 		"id": "sort",
 		"title": "Sort",
 		"canAscend": true,
-		"options": ["Latest", "A-Z", "Rating", "Views"]
+		"options": ["Latest", "A-Z", "Rating", "Views"],
+		"default": {
+			"index": 0,
+			"ascending": false
+		}
+	},
+	{
+		"type": "multi-select",
+		"id": "types",
+		"title": "Types",
+		"options": ["Doujinshi", "Manga", "Artist CG", "Western"],
+		"ids": ["4", "52", "4798", "36278"],
+		"defaultIncluded": ["4", "52", "4798", "36278"]
+	},
+	{
+		"type": "note",
+		"text": "Separate values with commas. Prefix a tag with - to exclude it."
+	},
+	{
+		"type": "text",
+		"id": "tags",
+		"title": "Tags",
+		"placeholder": "tag, -excluded tag"
+	},
+	{
+		"type": "text",
+		"id": "artists",
+		"title": "Artists",
+		"placeholder": "Separate with commas"
+	},
+	{
+		"type": "text",
+		"id": "circles",
+		"title": "Circles",
+		"placeholder": "Separate with commas"
+	},
+	{
+		"type": "text",
+		"id": "characters",
+		"title": "Characters",
+		"placeholder": "Separate with commas"
+	},
+	{
+		"type": "text",
+		"id": "collections",
+		"title": "Collections",
+		"placeholder": "Separate with commas"
+	},
+	{
+		"type": "text",
+		"id": "scanlators",
+		"title": "Scanlators",
+		"placeholder": "Separate with commas"
+	},
+	{
+		"type": "text",
+		"id": "conventions",
+		"title": "Conventions",
+		"placeholder": "Separate with commas"
+	},
+	{
+		"type": "note",
+		"text": "Uploaded year examples: >2024, <2024, or 2024."
+	},
+	{
+		"type": "text",
+		"id": "uploaded",
+		"title": "Uploaded",
+		"placeholder": ">2024"
+	},
+	{
+		"type": "note",
+		"text": "Page count examples: >20, <=50, or 30."
+	},
+	{
+		"type": "text",
+		"id": "pages",
+		"title": "Pages",
+		"placeholder": ">20"
 	}
 ]
