@@ -78,9 +78,9 @@
     {
       "id": "en.novelcrow",
       "name": "NovelCrow",
-      "version": 3,
-      "iconURL": "icons/en.novelcrow-v3.png",
-      "downloadURL": "sources/en.novelcrow-v3.aix",
+      "version": 4,
+      "iconURL": "icons/en.novelcrow-v4.png",
+      "downloadURL": "sources/en.novelcrow-v4.aix",
       "languages": [
         "en"
       ],
