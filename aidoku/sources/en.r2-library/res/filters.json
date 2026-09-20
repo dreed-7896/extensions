@@ -1,0 +1,13 @@
+[
+	{
+		"type": "sort",
+		"id": "sort",
+		"title": "Title",
+		"canAscend": true,
+		"options": ["Title"],
+		"default": {
+			"index": 0,
+			"ascending": true
+		}
+	}
+]
