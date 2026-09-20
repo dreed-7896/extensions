@@ -1,0 +1,18 @@
+{
+	"info": {
+		"id": "en.doujins",
+		"name": "Doujins",
+		"version": 1,
+		"url": "https://doujins.com",
+		"contentRating": 2,
+		"languages": ["en"]
+	},
+	"listings": [
+		{"id": "popular", "name": "Popular"},
+		{"id": "latest", "name": "Latest"}
+	],
+	"config": {
+		"hidesFiltersWhileSearching": true
+	}
+}
+

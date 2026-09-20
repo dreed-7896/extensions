@@ -1,0 +1,18 @@
+{
+	"info": {
+		"id": "en.hentainexus",
+		"name": "HentaiNexus",
+		"version": 1,
+		"minAppVersion": "0.7.1",
+		"url": "https://hentainexus.com",
+		"contentRating": 2,
+		"languages": ["en"]
+	},
+	"listings": [
+		{"id": "popular", "name": "Popular"},
+		{"id": "latest", "name": "Latest"}
+	],
+	"config": {
+		"hidesFiltersWhileSearching": true
+	}
+}

@@ -1,0 +1,4 @@
+sources/*/target/
+sources/*/package.aix
+templates/*/target/
+

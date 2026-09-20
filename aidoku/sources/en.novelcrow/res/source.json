@@ -1,0 +1,18 @@
+{
+	"info": {
+		"id": "en.novelcrow",
+		"name": "NovelCrow",
+		"version": 1,
+		"url": "https://novelcrow.com",
+		"contentRating": 2,
+		"languages": ["en"]
+	},
+	"listings": [
+		{"id": "popular", "name": "Popular"},
+		{"id": "latest", "name": "Latest"}
+	],
+	"config": {
+		"hidesFiltersWhileSearching": true
+	}
+}
+

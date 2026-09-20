@@ -1,0 +1,18 @@
+[package]
+name = "allporncomic"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aidoku = { git = "https://github.com/Aidoku/aidoku-rs.git", version = "0.3.0" }
+midoku-madara = { path = "../../templates/madara" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+strip = true
+lto = true
+

@@ -1,0 +1,19 @@
+[package]
+name = "doujins"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aidoku = { git = "https://github.com/Aidoku/aidoku-rs.git", version = "0.3.0", features = ["json"] }
+midoku-madara = { path = "../../templates/madara" }
+serde = { version = "1", default-features = false, features = ["derive"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+strip = true
+lto = true
+

@@ -1,0 +1,18 @@
+{
+	"info": {
+		"id": "en.hentairead",
+		"name": "HentaiRead",
+		"version": 1,
+		"url": "https://hentairead.com",
+		"contentRating": 2,
+		"languages": ["en"]
+	},
+	"listings": [
+		{"id": "popular", "name": "Popular"},
+		{"id": "latest", "name": "Latest"}
+	],
+	"config": {
+		"hidesFiltersWhileSearching": true
+	}
+}
+
