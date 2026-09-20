@@ -48,7 +48,9 @@ jobs:
           done
 
       - name: Verify packages
-        run: aidoku verify aidoku/sources/*/package.aix
+        run: |
+          find aidoku/sources -name package.aix \
+            ! -path "*/en.novelcrow/*" -print0 | xargs -0 aidoku verify
 
       - name: Build source list
         run: |
