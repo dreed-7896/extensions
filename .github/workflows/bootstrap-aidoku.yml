@@ -1,0 +1,52 @@
+name: Bootstrap Aidoku extensions
+
+on:
+  push:
+    branches:
+      - aidoku-extensions
+    paths:
+      - aidoku-source.zip
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Expand source bundle
+        run: |
+          unzip -o aidoku-source.zip
+          rm aidoku-source.zip
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Aidoku CLI
+        run: cargo install --git https://github.com/Aidoku/aidoku-rs aidoku-cli
+
+      - name: Package sources
+        run: |
+          for source in aidoku/sources/*; do
+            aidoku package "$source"
+          done
+
+      - name: Verify packages
+        run: aidoku verify aidoku/sources/*/package.aix
+
+      - name: Build source list
+        run: |
+          rm -rf aidoku/public
+          aidoku build aidoku/sources/*/package.aix --output aidoku/public --name "Midoku Aidoku Extensions"
+
+      - name: Commit sources and packages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add Aidoku extensions and source list"
+          git push
