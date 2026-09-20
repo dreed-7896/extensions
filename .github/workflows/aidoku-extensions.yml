@@ -1,0 +1,76 @@
+name: Build Aidoku extensions
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - aidoku-extensions
+    paths:
+      - "aidoku/sources/**/src/**"
+      - "aidoku/sources/**/res/**"
+      - "aidoku/sources/**/Cargo.toml"
+      - "aidoku/prebuilt/**"
+      - "aidoku/templates/**"
+      - ".github/workflows/aidoku-extensions.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aidoku-extensions
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: aidoku/sources
+
+      - name: Install Aidoku CLI
+        run: cargo install --git https://github.com/Aidoku/aidoku-rs aidoku-cli
+
+      - name: Package sources
+        run: |
+          for source in aidoku/sources/*; do
+            if [ "$(basename "$source")" = "en.novelcrow" ]; then
+              cp aidoku/prebuilt/en.novelcrow.aix "$source/package.aix"
+              continue
+            fi
+            aidoku package "$source"
+          done
+
+      - name: Verify packages
+        run: aidoku verify aidoku/sources/*/package.aix
+
+      - name: Build source list
+        run: |
+          rm -rf aidoku/public
+          aidoku build aidoku/sources/*/package.aix \
+            --output aidoku/public \
+            --name "Midoku Aidoku Extensions"
+
+      - name: Commit generated repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f aidoku/public
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Build Aidoku source list"
+          git push
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aidoku-source-list
+          path: aidoku/public
+          if-no-files-found: ignore
