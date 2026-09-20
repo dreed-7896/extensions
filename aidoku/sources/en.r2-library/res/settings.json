@@ -1,0 +1,75 @@
+[
+	{
+		"type": "text",
+		"key": "r2_endpoint",
+		"title": "Account ID or S3 endpoint",
+		"placeholder": "Cloudflare account ID",
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_bucket",
+		"title": "Bucket name",
+		"placeholder": "Bucket holding the library",
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_access_key_id",
+		"title": "Access Key ID",
+		"placeholder": "R2 API token access key",
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_secret_access_key",
+		"title": "Secret Access Key",
+		"placeholder": "R2 API token secret",
+		"secure": true,
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_root_prefix",
+		"title": "Library folder (optional)",
+		"placeholder": "Bucket root",
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_public_base_url",
+		"title": "Public image URL (optional)",
+		"placeholder": "r2.dev URL or custom domain",
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_region",
+		"title": "Region",
+		"default": "auto",
+		"autocapitalizationType": 0,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	},
+	{
+		"type": "text",
+		"key": "r2_latest_pages",
+		"title": "Latest scan limit (1000 objects/page)",
+		"default": "10",
+		"keyboardType": 4,
+		"autocorrectionDisabled": true,
+		"refreshes": ["content"]
+	}
+]
