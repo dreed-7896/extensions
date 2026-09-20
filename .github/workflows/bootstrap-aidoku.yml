@@ -6,6 +6,7 @@ on:
       - aidoku-extensions
     paths:
       - aidoku-source.zip
+      - .github/workflows/bootstrap-aidoku.yml
   workflow_dispatch:
 
 permissions:
@@ -21,6 +22,7 @@ jobs:
         run: |
           unzip -o aidoku-source.zip
           rm aidoku-source.zip
+          rm -f .github/workflows/aidoku-extensions.yml
 
       - uses: dtolnay/rust-toolchain@stable
         with:
