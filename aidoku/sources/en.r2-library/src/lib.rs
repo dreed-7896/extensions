@@ -7,7 +7,7 @@ mod util;
 mod zip;
 
 use aidoku::{
-	alloc::{borrow::ToOwned, format, string::{String, ToString}, vec, vec::Vec},
+	alloc::{borrow::ToOwned, format, string::String, vec, vec::Vec},
 	imports::defaults::defaults_get,
 	prelude::*,
 	Chapter, ContentRating, FilterValue, Home, HomeComponent, HomeComponentValue, HomeLayout,
@@ -105,8 +105,10 @@ impl R2Library {
 				let prefix = Self::series_prefix(config, &entry.name);
 				let cover = list_all(config, &prefix, Some("/"), 1)
 					.ok()
-					.and_then(|listing| Self::cover_object(&prefix, &listing))
-					.map(|object| config.content_url(&object.key));
+					.and_then(|listing| {
+						Self::cover_object(&prefix, &listing)
+							.map(|object| config.content_url(&object.key))
+					});
 				Manga {
 					key: entry.name.clone(),
 					title: entry.name.clone(),

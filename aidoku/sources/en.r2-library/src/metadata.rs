@@ -82,7 +82,7 @@ pub fn chapter_list(raw: &str) -> Vec<RemoteChapter> {
 
 fn remote_chapter(value: &Value) -> Option<RemoteChapter> {
 	let archive_url = string(value, "url").or_else(|| string(value, "archive"));
-	let pages = value
+	let pages: Vec<String> = value
 		.get("pages")
 		.and_then(Value::as_array)
 		.map(|values| {
