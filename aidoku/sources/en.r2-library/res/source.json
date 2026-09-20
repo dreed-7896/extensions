@@ -1,0 +1,21 @@
+{
+	"info": {
+		"id": "en.r2-library",
+		"name": "R2 Library",
+		"version": 1,
+		"url": "https://developers.cloudflare.com/r2/",
+		"contentRating": 2,
+		"languages": ["en"],
+		"minAppVersion": "0.7"
+	},
+	"listings": [
+		{
+			"id": "library",
+			"name": "Library"
+		},
+		{
+			"id": "recent",
+			"name": "Recently Updated"
+		}
+	]
+}
