@@ -101,6 +101,19 @@
       "baseURL": "https://omegascans.org"
     },
     {
+      "id": "en.r2-library",
+      "name": "R2 Library",
+      "version": 1,
+      "iconURL": "icons/en.r2-library-v1.png",
+      "downloadURL": "sources/en.r2-library-v1.aix",
+      "languages": [
+        "en"
+      ],
+      "contentRating": 2,
+      "baseURL": "https://developers.cloudflare.com/r2/",
+      "minAppVersion": "0.7"
+    },
+    {
       "id": "multi.pandachaika",
       "name": "PandaChaika",
       "version": 2,
