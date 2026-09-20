@@ -5,11 +5,11 @@ use aidoku::{
 	helpers::uri::QueryParameters,
 	imports::net::Request,
 	prelude::*,
-	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, ImageRequestProvider,
-	Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result,
-	Source, UpdateStrategy,
+	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
+	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
+	PageContent, Result, Source, UpdateStrategy,
 };
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{engine::general_purpose::{STANDARD, URL_SAFE}, Engine as _};
 use midoku_madara::is_blocked;
 use serde_json::Value;
 
@@ -190,70 +190,117 @@ impl Source for HentaiRead {
 		}
 
 		if needs_chapters {
-			manga.chapters = Some(vec![Chapter {
-				key: manga.key.clone(),
-				title: Some("Chapter".into()),
-				chapter_number: Some(1.0),
-				url: Some(url),
-				language: Some("en".into()),
-				..Default::default()
-			}]);
+			let mut chapters = document
+				.select("a[href*='/p/1/'], a[href$='/english/'], a[href$='/japanese/'], a[href$='/chinese/']")
+				.map(|elements| {
+					elements
+						.filter_map(|element| {
+							let href = element.attr("abs:href").or_else(|| element.attr("href"))?;
+							let mut reader_url = Self::absolute_url(&href);
+							if !reader_url.contains("/p/") {
+								reader_url = format!("{}/p/1/", reader_url.trim_end_matches('/'));
+							}
+							let lower = reader_url.to_ascii_lowercase();
+							let (label, language) = if lower.contains("/english/") {
+								("English", "en")
+							} else if lower.contains("/japanese/") {
+								("Japanese", "ja")
+							} else if lower.contains("/chinese/") {
+								("Chinese", "zh")
+							} else {
+								("Chapter", "en")
+							};
+							Some(Chapter {
+								key: reader_url.clone(),
+								title: Some(label.into()),
+								url: Some(reader_url),
+								language: Some(language.into()),
+								..Default::default()
+							})
+						})
+						.fold(Vec::new(), |mut chapters, chapter| {
+							if !chapters.iter().any(|existing: &Chapter| existing.key == chapter.key) {
+								chapters.push(chapter);
+							}
+							chapters
+						})
+				})
+				.unwrap_or_default();
+			if chapters.is_empty() {
+				let reader_url = format!("{}/english/p/1/", url.trim_end_matches('/'));
+				chapters.push(Chapter {
+					key: reader_url.clone(),
+					title: Some("English".into()),
+					chapter_number: Some(1.0),
+					url: Some(reader_url),
+					language: Some("en".into()),
+					..Default::default()
+				});
+			}
+			manga.chapters = Some(chapters);
 		}
 		Ok(manga)
 	}
 
-	fn get_page_list(&self, manga: Manga, _chapter: Chapter) -> Result<Vec<Page>> {
+	fn get_page_list(&self, manga: Manga, chapter: Chapter) -> Result<Vec<Page>> {
 		let manga_url = Self::absolute_url(&manga.key);
-		let reader_url = format!("{}english/p/1/", manga_url.trim_end_matches('/').to_owned() + "/");
+		let reader_url = if chapter.key.contains("/p/") {
+			Self::absolute_url(&chapter.key)
+		} else {
+			format!("{}/english/p/1/", manga_url.trim_end_matches('/'))
+		};
 		let document = Request::get(&reader_url)?.html()?;
 
-		let base_script = document
+		let page_base = document
 			.select_first("#single-chapter-js-extra")
 			.and_then(|element| element.data())
-			.ok_or_else(|| aidoku::AidokuError::message("Image base URL was not found"))?;
-		let json_start = base_script
-			.find('{')
-			.ok_or_else(|| aidoku::AidokuError::message("Image base URL was not found"))?;
-		let json_end = base_script
-			.rfind('}')
-			.ok_or_else(|| aidoku::AidokuError::message("Image base URL was not found"))?;
-		let base_value: Value = serde_json::from_str(&base_script[json_start..=json_end])
-			.map_err(|_| aidoku::AidokuError::message("Invalid image base URL data"))?;
-		let page_base = base_value
-			.get("baseUrl")
-			.and_then(Value::as_str)
-			.unwrap_or("");
+			.and_then(|script| {
+				let start = script.find('{')?;
+				let end = script[start..].find('}')? + start;
+				serde_json::from_str::<Value>(&script[start..=end]).ok()
+			})
+			.and_then(|value| value.get("baseUrl").and_then(Value::as_str).map(String::from))
+			.unwrap_or_default();
 
-		let pages_script = document
+		let mut pages = Vec::new();
+		if let Some(mut encoded) = document
 			.select_first("#single-chapter-js-before")
 			.and_then(|element| element.data())
-			.ok_or_else(|| aidoku::AidokuError::message("Reader data was not found"))?;
-		let encoded = Self::extract_base64(&pages_script)
-			.ok_or_else(|| aidoku::AidokuError::message("Reader data was not found"))?;
-		let decoded = STANDARD
-			.decode(encoded.as_bytes())
-			.map_err(|_| aidoku::AidokuError::message("Invalid reader data"))?;
-		let value: Value = serde_json::from_slice(&decoded)
-			.map_err(|_| aidoku::AidokuError::message("Invalid reader data"))?;
-		let images = value
-			.pointer("/data/chapter/images")
-			.and_then(Value::as_array)
-			.ok_or_else(|| aidoku::AidokuError::message("Reader images were not found"))?;
-		let pages = images
-			.iter()
-			.filter_map(|image| image.get("src").and_then(Value::as_str))
-			.map(|path| {
-				let url = if page_base.is_empty() {
-					Self::absolute_url(path)
-				} else {
-					format!("{}/{}", page_base.trim_end_matches('/'), path.trim_start_matches('/'))
-				};
-				Page {
-					content: PageContent::url(url),
-					..Default::default()
+			.and_then(|script| Self::extract_base64(&script).map(String::from))
+		{
+			while encoded.len() % 4 != 0 {
+				encoded.push('=');
+			}
+			if let Ok(decoded) = STANDARD.decode(encoded.as_bytes()).or_else(|_| URL_SAFE.decode(encoded.as_bytes())) {
+				if let Ok(value) = serde_json::from_slice::<Value>(&decoded) {
+					if let Some(images) = value.pointer("/data/chapter/images").and_then(Value::as_array) {
+						pages = images
+							.iter()
+							.filter_map(|image| image.get("src").and_then(Value::as_str))
+							.map(|path| {
+								let url = if page_base.is_empty() {
+									Self::absolute_url(path)
+								} else {
+									format!("{}/{}", page_base.trim_end_matches('/'), path.trim_start_matches('/'))
+								};
+								Page { content: PageContent::url(url), ..Default::default() }
+							})
+							.collect();
+					}
 				}
-			})
-			.collect::<Vec<_>>();
+			}
+		}
+		if pages.is_empty() {
+			pages = document
+				.select(".reading-content img, .page-break img, img.wp-manga-chapter-img")
+				.map(|elements| {
+					elements
+						.filter_map(|element| Self::image_url(&element))
+						.map(|url| Page { content: PageContent::url(url), ..Default::default() })
+						.collect()
+				})
+				.unwrap_or_default();
+		}
 		if pages.is_empty() {
 			bail!("No readable pages were returned.");
 		}
@@ -268,6 +315,15 @@ impl ListingProvider for HentaiRead {
 			"latest" => Self::browse("new", page),
 			_ => bail!("Unknown listing"),
 		}
+	}
+}
+
+impl Home for HentaiRead {
+	fn get_home(&self) -> Result<HomeLayout> {
+		Ok(midoku_madara::home_layout(
+			Self::browse("views", 1)?.entries,
+			Self::browse("new", 1)?.entries,
+		))
 	}
 }
 
@@ -295,6 +351,7 @@ impl DeepLinkHandler for HentaiRead {
 register_source!(
 	HentaiRead,
 	ListingProvider,
+	Home,
 	ImageRequestProvider,
 	DeepLinkHandler
 );

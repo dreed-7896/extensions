@@ -5,9 +5,9 @@ use aidoku::{
 	helpers::uri::encode_uri_component,
 	imports::net::Request,
 	prelude::*,
-	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, ImageRequestProvider,
-	Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result,
-	Source, UpdateStrategy, Viewer,
+	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
+	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
+	PageContent, Result, Source, UpdateStrategy, Viewer,
 };
 use midoku_madara::is_blocked;
 use serde::Deserialize;
@@ -318,6 +318,15 @@ impl ListingProvider for HiperDex {
 	}
 }
 
+impl Home for HiperDex {
+	fn get_home(&self) -> Result<HomeLayout> {
+		Ok(midoku_madara::home_layout(
+			Self::search("", "popular", 1)?.entries,
+			Self::search("", "recent", 1)?.entries,
+		))
+	}
+}
+
 impl ImageRequestProvider for HiperDex {
 	fn get_image_request(
 		&self,
@@ -341,6 +350,7 @@ impl DeepLinkHandler for HiperDex {
 register_source!(
 	HiperDex,
 	ListingProvider,
+	Home,
 	ImageRequestProvider,
 	DeepLinkHandler
 );

@@ -2,7 +2,7 @@
 	"info": {
 		"id": "en.doujins",
 		"name": "Doujins",
-		"version": 1,
+		"version": 2,
 		"url": "https://doujins.com",
 		"contentRating": 2,
 		"languages": ["en"]
@@ -15,4 +15,3 @@
 		"hidesFiltersWhileSearching": true
 	}
 }
-

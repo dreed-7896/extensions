@@ -5,9 +5,9 @@ use aidoku::{
 	helpers::uri::{encode_uri_component, QueryParameters},
 	imports::{net::Request, std::parse_date},
 	prelude::*,
-	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, ImageRequestProvider,
-	Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result,
-	Source, UpdateStrategy,
+	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
+	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
+	PageContent, Result, Source, UpdateStrategy,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use midoku_madara::is_blocked;
@@ -282,6 +282,15 @@ impl ListingProvider for HentaiNexus {
 	}
 }
 
+impl Home for HentaiNexus {
+	fn get_home(&self) -> Result<HomeLayout> {
+		Ok(midoku_madara::home_layout(
+			self.get_manga_list(Listing { id: "popular".into(), name: "Popular".into(), ..Default::default() }, 1)?.entries,
+			self.get_manga_list(Listing { id: "latest".into(), name: "Latest".into(), ..Default::default() }, 1)?.entries,
+		))
+	}
+}
+
 impl ImageRequestProvider for HentaiNexus {
 	fn get_image_request(
 		&self,
@@ -304,6 +313,7 @@ impl DeepLinkHandler for HentaiNexus {
 register_source!(
 	HentaiNexus,
 	ListingProvider,
+	Home,
 	ImageRequestProvider,
 	DeepLinkHandler
 );

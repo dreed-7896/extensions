@@ -5,9 +5,9 @@ use aidoku::{
 	helpers::uri::QueryParameters,
 	imports::{net::Request, std::current_date},
 	prelude::*,
-	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, ImageRequestProvider,
-	Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result,
-	Source, UpdateStrategy,
+	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
+	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
+	PageContent, Result, Source, UpdateStrategy,
 };
 use midoku_madara::is_blocked;
 use serde::Deserialize;
@@ -245,6 +245,15 @@ impl ListingProvider for Doujins {
 	}
 }
 
+impl Home for Doujins {
+	fn get_home(&self) -> Result<HomeLayout> {
+		Ok(midoku_madara::home_layout(
+			Self::popular(1)?.entries,
+			Self::latest(1)?.entries,
+		))
+	}
+}
+
 impl ImageRequestProvider for Doujins {
 	fn get_image_request(
 		&self,
@@ -266,6 +275,7 @@ impl DeepLinkHandler for Doujins {
 register_source!(
 	Doujins,
 	ListingProvider,
+	Home,
 	ImageRequestProvider,
 	DeepLinkHandler
 );

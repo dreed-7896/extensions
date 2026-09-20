@@ -5,8 +5,8 @@ use aidoku::{
 	imports::{html::Element, net::Request},
 	prelude::*,
 	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, ImageRequestProvider,
-	Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result,
-	Source, UpdateStrategy,
+	Home, HomeComponent, HomeComponentValue, HomeLayout, Listing, ListingProvider, Manga,
+	MangaPageResult, MangaStatus, Page, PageContent, Result, Source, UpdateStrategy,
 };
 use core::marker::PhantomData;
 
@@ -293,6 +293,44 @@ impl<I: Impl> ListingProvider for Madara<I> {
 			"latest" => self.browse(self.params().latest_order, page, None),
 			_ => bail!("Unknown listing"),
 		}
+	}
+}
+
+impl<I: Impl> Home for Madara<I> {
+	fn get_home(&self) -> Result<HomeLayout> {
+		let params = self.params();
+		let popular = self.browse(params.popular_order, 1, None)?.entries;
+		let latest = self.browse(params.latest_order, 1, None)?.entries;
+		Ok(home_layout(popular, latest))
+	}
+}
+
+pub fn home_layout(popular: Vec<Manga>, latest: Vec<Manga>) -> HomeLayout {
+	HomeLayout {
+		components: vec![
+			HomeComponent {
+				title: Some("Popular".into()),
+				subtitle: None,
+				value: HomeComponentValue::BigScroller {
+					entries: popular,
+					auto_scroll_interval: Some(6.0),
+				},
+			},
+			HomeComponent {
+				title: Some("Latest Updates".into()),
+				subtitle: None,
+				value: HomeComponentValue::MangaList {
+					ranking: false,
+					page_size: Some(20),
+					entries: latest.into_iter().map(Into::into).collect(),
+					listing: Some(Listing {
+						id: "latest".into(),
+						name: "Latest".into(),
+						..Default::default()
+					}),
+				},
+			},
+		],
 	}
 }
 

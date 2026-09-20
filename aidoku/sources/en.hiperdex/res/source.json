@@ -2,7 +2,7 @@
 	"info": {
 		"id": "en.hiperdex",
 		"name": "HiperDex",
-		"version": 1,
+		"version": 2,
 		"url": "https://hiperdex.tv",
 		"contentRating": 2,
 		"languages": ["en"]
@@ -15,4 +15,3 @@
 		"hidesFiltersWhileSearching": true
 	}
 }
-

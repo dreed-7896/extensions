@@ -1,10 +1,9 @@
 {
 	"info": {
-		"id": "en.hentainexus",
-		"name": "HentaiNexus",
-		"version": 2,
-		"minAppVersion": "0.7.1",
-		"url": "https://hentainexus.com",
+		"id": "en.omegascans",
+		"name": "Omega Scans",
+		"version": 1,
+		"url": "https://omegascans.org",
 		"contentRating": 2,
 		"languages": ["en"]
 	},

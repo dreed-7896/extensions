@@ -1,6 +1,6 @@
 #![no_std]
 
-use aidoku::{prelude::*, DeepLinkHandler, ImageRequestProvider, ListingProvider, Source};
+use aidoku::{prelude::*, DeepLinkHandler, Home, ImageRequestProvider, ListingProvider, Source};
 use midoku_madara::{Impl, Madara, Params};
 
 struct AllPornComic;
@@ -24,7 +24,7 @@ impl Impl for AllPornComic {
 register_source!(
 	Madara<AllPornComic>,
 	ListingProvider,
+	Home,
 	ImageRequestProvider,
 	DeepLinkHandler
 );
-
