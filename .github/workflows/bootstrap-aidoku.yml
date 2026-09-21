@@ -36,7 +36,7 @@ jobs:
         run: |
           unzip -o aidoku-source.zip
           rm aidoku-source.zip
-		  rm -rf aidoku/sources/en.r2-library aidoku/sources/multi.ehentai
+          rm -rf aidoku/sources/en.r2-library aidoku/sources/multi.ehentai
 
       - uses: dtolnay/rust-toolchain@stable
         if: steps.bundle.outputs.present == 'true'
@@ -86,7 +86,7 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-		  git commit -m "Fix IMHentai thumbnails and remove E-Hentai"
+          git commit -m "Fix IMHentai thumbnails and remove E-Hentai"
           git push
 
       - uses: actions/upload-artifact@v4
