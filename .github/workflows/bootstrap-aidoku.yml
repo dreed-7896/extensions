@@ -12,26 +12,86 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: bootstrap-aidoku-extensions
+  cancel-in-progress: true
+
 jobs:
-  expand:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Expand source bundle
+      - name: Check source bundle
+        id: bundle
         run: |
-          if [ ! -f aidoku-source.zip ]; then
-            echo "No source bundle; nothing to do."
-            exit 0
+          if [ -f aidoku-source.zip ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Expand source bundle
+        if: steps.bundle.outputs.present == 'true'
+        run: |
           unzip -o aidoku-source.zip
           rm aidoku-source.zip
           rm -rf aidoku/sources/en.r2-library
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.bundle.outputs.present == 'true'
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        if: steps.bundle.outputs.present == 'true'
+        with:
+          workspaces: aidoku/sources
+
+      - name: Install Aidoku CLI
+        if: steps.bundle.outputs.present == 'true'
+        run: cargo install --git https://github.com/Aidoku/aidoku-rs aidoku-cli
+
+      - name: Package sources
+        if: steps.bundle.outputs.present == 'true'
+        run: |
+          for source in aidoku/sources/*; do
+            if [ "$(basename "$source")" = "en.novelcrow" ]; then
+              cp aidoku/prebuilt/en.novelcrow.aix "$source/package.aix"
+              continue
+            fi
+            aidoku package "$source"
+          done
+
+      - name: Verify packages
+        if: steps.bundle.outputs.present == 'true'
+        run: |
+          find aidoku/sources -name package.aix \
+            ! -path "*/en.novelcrow/*" -print0 | xargs -0 aidoku verify
+
+      - name: Build source list
+        if: steps.bundle.outputs.present == 'true'
+        run: |
+          rm -rf aidoku/public
+          aidoku build aidoku/sources/*/package.aix \
+            --output aidoku/public \
+            --name "Midoku Aidoku Extensions"
+
+      - name: Commit sources and packages
+        if: steps.bundle.outputs.present == 'true'
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Update Aidoku sources"
+          git commit -m "Build E-Hentai and IMHentai sources"
           git push
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.bundle.outputs.present == 'true'
+        with:
+          name: aidoku-source-list
+          path: aidoku/public
+          if-no-files-found: ignore
