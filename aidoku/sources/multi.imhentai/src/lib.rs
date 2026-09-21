@@ -81,6 +81,31 @@ impl IMHentai {
 		element.attr("abs:src")
 	}
 
+	fn card_cover(element: &aidoku::imports::html::Element) -> Option<String> {
+		for selector in [
+			".inner_thumb img[data-src]:not(.thumb_flag)",
+			".inner_thumb img[data-original]:not(.thumb_flag)",
+			".inner_thumb img[data-lazy-src]:not(.thumb_flag)",
+			".inner_thumb a img:not(.thumb_flag)",
+			".inner_thumb img:not(.thumb_flag)",
+		] {
+			let Some(image) = element.select_first(selector) else {
+				continue;
+			};
+			let Some(url) = Self::image_url(&image) else {
+				continue;
+			};
+			let lowercase_url = url.to_ascii_lowercase();
+			if !lowercase_url.contains("/flags/")
+				&& !lowercase_url.contains("/flag/")
+				&& !lowercase_url.contains("thumb_flag")
+			{
+				return Some(url);
+			}
+		}
+		None
+	}
+
 	fn parse_cards(document: &Document) -> MangaPageResult {
 		let entries = document
 			.select("div.thumb")
@@ -99,9 +124,7 @@ impl IMHentai {
 						}
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
 						let url = Self::absolute_url(&href);
-						let cover = element
-							.select_first(".inner_thumb img, img")
-							.and_then(|image| Self::image_url(&image));
+						let cover = Self::card_cover(&element);
 						Some(Manga {
 							key: Self::key_from_url(&url),
 							title,

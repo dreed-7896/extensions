@@ -101,39 +101,11 @@
       "baseURL": "https://omegascans.org"
     },
     {
-      "id": "multi.ehentai",
-      "name": "E-Hentai",
-      "version": 3,
-      "iconURL": "icons/multi.ehentai-v3.png",
-      "downloadURL": "sources/multi.ehentai-v3.aix",
-      "languages": [
-        "All",
-        "ja",
-        "en",
-        "zh",
-        "nl",
-        "fr",
-        "de",
-        "hu",
-        "it",
-        "ko",
-        "pl",
-        "pt-BR",
-        "ru",
-        "es",
-        "th",
-        "vi"
-      ],
-      "contentRating": 2,
-      "baseURL": "https://e-hentai.org",
-      "minAppVersion": "0.7.1"
-    },
-    {
       "id": "multi.imhentai",
       "name": "IMHentai",
-      "version": 2,
-      "iconURL": "icons/multi.imhentai-v2.png",
-      "downloadURL": "sources/multi.imhentai-v2.aix",
+      "version": 3,
+      "iconURL": "icons/multi.imhentai-v3.png",
+      "downloadURL": "sources/multi.imhentai-v3.aix",
       "languages": [
         "All",
         "en",
