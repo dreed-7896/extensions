@@ -101,17 +101,51 @@
       "baseURL": "https://omegascans.org"
     },
     {
-      "id": "en.r2-library",
-      "name": "R2 Library",
-      "version": 1,
-      "iconURL": "icons/en.r2-library-v1.png",
-      "downloadURL": "sources/en.r2-library-v1.aix",
+      "id": "multi.ehentai",
+      "name": "E-Hentai",
+      "version": 3,
+      "iconURL": "icons/multi.ehentai-v3.png",
+      "downloadURL": "sources/multi.ehentai-v3.aix",
       "languages": [
-        "en"
+        "All",
+        "ja",
+        "en",
+        "zh",
+        "nl",
+        "fr",
+        "de",
+        "hu",
+        "it",
+        "ko",
+        "pl",
+        "pt-BR",
+        "ru",
+        "es",
+        "th",
+        "vi"
       ],
       "contentRating": 2,
-      "baseURL": "https://developers.cloudflare.com/r2/",
-      "minAppVersion": "0.7"
+      "baseURL": "https://e-hentai.org",
+      "minAppVersion": "0.7.1"
+    },
+    {
+      "id": "multi.imhentai",
+      "name": "IMHentai",
+      "version": 2,
+      "iconURL": "icons/multi.imhentai-v2.png",
+      "downloadURL": "sources/multi.imhentai-v2.aix",
+      "languages": [
+        "All",
+        "en",
+        "ja",
+        "es",
+        "fr",
+        "ko",
+        "de",
+        "ru"
+      ],
+      "contentRating": 2,
+      "baseURL": "https://imhentai.xxx"
     },
     {
       "id": "multi.pandachaika",
