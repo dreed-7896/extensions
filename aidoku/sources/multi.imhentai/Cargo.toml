@@ -1,13 +1,12 @@
 [package]
-name = "r2-library"
+name = "imhentai"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 aidoku = { git = "https://github.com/Aidoku/aidoku-rs.git", version = "0.3.0" }
-hmac = { version = "0.12", default-features = false }
+midoku-madara = { path = "../../templates/madara" }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
-sha2 = { version = "0.10", default-features = false }
 
 [lib]
 crate-type = ["cdylib"]

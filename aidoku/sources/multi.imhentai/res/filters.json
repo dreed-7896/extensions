@@ -1,0 +1,55 @@
+[
+	{
+		"type": "sort",
+		"id": "sort",
+		"title": "Sort",
+		"canAscend": false,
+		"options": ["Popular", "Latest", "Downloads", "Top Rated"]
+	},
+	{
+		"type": "multi-select",
+		"id": "categories",
+		"title": "Categories",
+		"options": ["Manga", "Doujinshi", "Western", "Image Set", "Artist CG", "Game CG"],
+		"ids": ["m", "d", "w", "i", "a", "g"],
+		"defaultIncluded": ["m", "d", "w", "i", "a", "g"]
+	},
+	{
+		"type": "text",
+		"id": "tags",
+		"title": "Tags",
+		"placeholder": "tag1, -excluded"
+	},
+	{
+		"type": "text",
+		"id": "parodies",
+		"title": "Parodies",
+		"placeholder": "parody1, -excluded"
+	},
+	{
+		"type": "text",
+		"id": "artists",
+		"title": "Artists",
+		"placeholder": "artist1, -excluded"
+	},
+	{
+		"type": "text",
+		"id": "characters",
+		"title": "Characters",
+		"placeholder": "character1, -excluded"
+	},
+	{
+		"type": "text",
+		"id": "groups",
+		"title": "Groups",
+		"placeholder": "group1, -excluded"
+	},
+	{
+		"type": "select",
+		"id": "speechless",
+		"title": "Speechless only",
+		"options": ["Off", "On"],
+		"ids": ["off", "on"],
+		"default": "off"
+	}
+]
