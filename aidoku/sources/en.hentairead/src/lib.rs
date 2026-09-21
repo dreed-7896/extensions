@@ -16,7 +16,6 @@ use aidoku::{
 	PageContent, PageContext, Result, Source, UpdateStrategy,
 };
 use base64::{engine::general_purpose::{STANDARD, URL_SAFE}, Engine as _};
-use midoku_madara::is_blocked;
 use serde_json::Value;
 
 const BASE_URL: &str = "https://hentairead.com";
@@ -79,7 +78,7 @@ impl HentaiRead {
 							.or_else(|| link.text())?
 							.trim()
 							.to_owned();
-						if title.is_empty() || is_blocked(&title) {
+						if title.is_empty() {
 							return None;
 						}
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
@@ -196,9 +195,6 @@ impl HentaiRead {
 	fn search_url(query: Option<String>, page: i32, filters: Vec<FilterValue>) -> Result<String> {
 		let mut params = QueryParameters::new();
 		if let Some(query) = query.map(|query| query.trim().to_owned()).filter(|query| !query.is_empty()) {
-			if is_blocked(&query) {
-				bail!("This search term is not supported.");
-			}
 			params.push("s", Some(&query));
 		} else {
 			params.push("s", Some(""));
@@ -438,11 +434,6 @@ impl Source for HentaiRead {
 		manga.update_strategy = UpdateStrategy::Never;
 		manga.content_rating = ContentRating::NSFW;
 		manga.url = Some(url.clone());
-
-		let tags = manga.tags.as_ref().map(|value| value.join(" ")).unwrap_or_default();
-		if is_blocked(&format!("{} {tags}", manga.title)) {
-			bail!("This title is not supported.");
-		}
 
 		if needs_chapters {
 			manga.chapters = Some(vec![Chapter {

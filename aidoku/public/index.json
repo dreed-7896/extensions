@@ -4,9 +4,9 @@
     {
       "id": "en.allporncomic",
       "name": "AllPornComic",
-      "version": 2,
-      "iconURL": "icons/en.allporncomic-v2.png",
-      "downloadURL": "sources/en.allporncomic-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.allporncomic-v3.png",
+      "downloadURL": "sources/en.allporncomic-v3.aix",
       "languages": [
         "en"
       ],
@@ -16,9 +16,9 @@
     {
       "id": "en.doujins",
       "name": "Doujins",
-      "version": 2,
-      "iconURL": "icons/en.doujins-v2.png",
-      "downloadURL": "sources/en.doujins-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.doujins-v3.png",
+      "downloadURL": "sources/en.doujins-v3.aix",
       "languages": [
         "en"
       ],
@@ -28,9 +28,9 @@
     {
       "id": "en.hentai2read",
       "name": "Hentai2Read",
-      "version": 1,
-      "iconURL": "icons/en.hentai2read-v1.png",
-      "downloadURL": "sources/en.hentai2read-v1.aix",
+      "version": 2,
+      "iconURL": "icons/en.hentai2read-v2.png",
+      "downloadURL": "sources/en.hentai2read-v2.aix",
       "languages": [
         "en"
       ],
@@ -40,9 +40,9 @@
     {
       "id": "en.hentainexus",
       "name": "HentaiNexus",
-      "version": 2,
-      "iconURL": "icons/en.hentainexus-v2.png",
-      "downloadURL": "sources/en.hentainexus-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.hentainexus-v3.png",
+      "downloadURL": "sources/en.hentainexus-v3.aix",
       "languages": [
         "en"
       ],
@@ -53,9 +53,9 @@
     {
       "id": "en.hentairead",
       "name": "HentaiRead",
-      "version": 4,
-      "iconURL": "icons/en.hentairead-v4.png",
-      "downloadURL": "sources/en.hentairead-v4.aix",
+      "version": 5,
+      "iconURL": "icons/en.hentairead-v5.png",
+      "downloadURL": "sources/en.hentairead-v5.aix",
       "languages": [
         "en"
       ],
@@ -66,9 +66,9 @@
     {
       "id": "en.hiperdex",
       "name": "HiperDex",
-      "version": 2,
-      "iconURL": "icons/en.hiperdex-v2.png",
-      "downloadURL": "sources/en.hiperdex-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.hiperdex-v3.png",
+      "downloadURL": "sources/en.hiperdex-v3.aix",
       "languages": [
         "en"
       ],
@@ -91,9 +91,9 @@
     {
       "id": "en.omegascans",
       "name": "Omega Scans",
-      "version": 1,
-      "iconURL": "icons/en.omegascans-v1.png",
-      "downloadURL": "sources/en.omegascans-v1.aix",
+      "version": 2,
+      "iconURL": "icons/en.omegascans-v2.png",
+      "downloadURL": "sources/en.omegascans-v2.aix",
       "languages": [
         "en"
       ],
@@ -103,9 +103,9 @@
     {
       "id": "multi.imhentai",
       "name": "IMHentai",
-      "version": 3,
-      "iconURL": "icons/multi.imhentai-v3.png",
-      "downloadURL": "sources/multi.imhentai-v3.aix",
+      "version": 4,
+      "iconURL": "icons/multi.imhentai-v4.png",
+      "downloadURL": "sources/multi.imhentai-v4.aix",
       "languages": [
         "All",
         "en",
@@ -122,9 +122,9 @@
     {
       "id": "multi.pandachaika",
       "name": "PandaChaika",
-      "version": 2,
-      "iconURL": "icons/multi.pandachaika-v2.png",
-      "downloadURL": "sources/multi.pandachaika-v2.aix",
+      "version": 3,
+      "iconURL": "icons/multi.pandachaika-v3.png",
+      "downloadURL": "sources/multi.pandachaika-v3.aix",
       "languages": [
         "multi"
       ],

@@ -9,7 +9,6 @@ use aidoku::{
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
 	PageContent, Result, Source, UpdateStrategy,
 };
-use midoku_madara::is_blocked;
 use serde::Deserialize;
 
 const BASE_URL: &str = "https://panda.chaika.moe";
@@ -65,10 +64,6 @@ impl PandaChaika {
 	}
 
 	fn to_manga(archive: LongArchive) -> Option<Manga> {
-		let searchable = format!("{} {}", archive.title, archive.tags.join(" "));
-		if is_blocked(&searchable) {
-			return None;
-		}
 		let artists = archive
 			.tags
 			.iter()
@@ -117,9 +112,6 @@ impl PandaChaika {
 	}
 
 	fn search(query: &str, sort: &str, page: i32) -> Result<MangaPageResult> {
-		if is_blocked(query) {
-			bail!("This search term is not supported.");
-		}
 		let mut params = QueryParameters::new();
 		params.push("title", Some(query));
 		params.push("sort", Some(sort));
@@ -233,13 +225,6 @@ impl Source for PandaChaika {
 		_needs_details: bool,
 		needs_chapters: bool,
 	) -> Result<Manga> {
-		if is_blocked(&format!(
-			"{} {}",
-			manga.title,
-			manga.tags.as_ref().map(|tags| tags.join(" ")).unwrap_or_default()
-		)) {
-			bail!("This title is not supported.");
-		}
 		manga.content_rating = ContentRating::NSFW;
 		manga.status = MangaStatus::Completed;
 		manga.update_strategy = UpdateStrategy::Never;

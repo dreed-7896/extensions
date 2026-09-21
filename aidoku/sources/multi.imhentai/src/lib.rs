@@ -8,14 +8,13 @@ use aidoku::{
 		vec,
 		vec::Vec,
 	},
-	helpers::uri::QueryParameters,
+	helpers::uri::{QueryParameters, encode_uri_component},
 	imports::{defaults::defaults_get, html::Document, net::Request},
 	prelude::*,
 	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
 	PageContent, PageContext, Result, Source, UpdateStrategy,
 };
-use midoku_madara::is_blocked;
 use serde_json::Value;
 
 const BASE_URL: &str = "https://imhentai.xxx";
@@ -119,7 +118,7 @@ impl IMHentai {
 							.or_else(|| link.attr("title"))?
 							.trim()
 							.to_owned();
-						if title.is_empty() || is_blocked(&title) {
+						if title.is_empty() {
 							return None;
 						}
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
@@ -182,9 +181,6 @@ impl IMHentai {
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
 		let query = query.unwrap_or_default();
-		if is_blocked(&query) {
-			bail!("This search term is not supported.");
-		}
 
 		let mut sort_index = 0;
 		let mut selected_categories: Option<Vec<String>> = None;
@@ -270,11 +266,20 @@ impl IMHentai {
 		}
 
 		let key = if advanced_terms.is_empty() {
-			query.trim().to_owned()
+			query
+				.trim()
+				.split(',')
+				.map(|term| encode_uri_component(term.trim()).replace("%20", "+"))
+				.collect::<Vec<_>>()
+				.join(",")
 		} else {
 			advanced_terms.join(" ")
 		};
-		parameters.push("key", Some(&key));
+		if advanced_terms.is_empty() {
+			parameters.push_encoded("key", Some(&key));
+		} else {
+			parameters.push("key", Some(&key));
+		}
 		parameters.push("page", Some(&page.to_string()));
 
 		let url = format!("{BASE_URL}/search/?{parameters}");
@@ -390,19 +395,6 @@ impl Source for IMHentai {
 		manga.url = Some(url.clone());
 		manga.content_rating = ContentRating::NSFW;
 		manga.update_strategy = UpdateStrategy::Never;
-
-		let searchable = format!(
-			"{} {}",
-			manga.title,
-			manga
-				.tags
-				.as_ref()
-				.map(|tags| tags.join(" "))
-				.unwrap_or_default()
-		);
-		if is_blocked(&searchable) {
-			bail!("This title is not supported.");
-		}
 
 		if needs_chapters {
 			manga.chapters = Some(vec![Chapter {

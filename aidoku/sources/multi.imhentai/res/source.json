@@ -2,7 +2,7 @@
 	"info": {
 		"id": "multi.imhentai",
 		"name": "IMHentai",
-		"version": 3,
+		"version": 4,
 		"url": "https://imhentai.xxx",
 		"contentRating": 2,
 		"languages": ["All", "en", "ja", "es", "fr", "ko", "de", "ru"]

@@ -9,7 +9,6 @@ use aidoku::{
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
 	PageContent, Result, Source, UpdateStrategy, Viewer,
 };
-use midoku_madara::is_blocked;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -98,9 +97,6 @@ impl HiperDex {
 		if let Some(rating) = dto.content_rating.as_ref() {
 			tags.push(rating.clone());
 		}
-		if is_blocked(&format!("{} {}", dto.title, tags.join(" "))) {
-			return None;
-		}
 		let status = match dto.status.as_deref().map(|value| value.to_ascii_lowercase()).as_deref() {
 			Some("ongoing") => MangaStatus::Ongoing,
 			Some("completed") => MangaStatus::Completed,
@@ -130,9 +126,6 @@ impl HiperDex {
 	}
 
 	fn search(query: &str, sort: &str, page: i32) -> Result<MangaPageResult> {
-		if is_blocked(query) {
-			bail!("This search term is not supported.");
-		}
 		let input = json!({
 			"0": {
 				"json": {

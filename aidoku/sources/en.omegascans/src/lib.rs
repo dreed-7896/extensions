@@ -9,7 +9,6 @@ use aidoku::{
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
 	PageContent, Result, Source, UpdateStrategy, Viewer,
 };
-use midoku_madara::is_blocked;
 use serde::Deserialize;
 
 const BASE_URL: &str = "https://omegascans.org";
@@ -126,9 +125,6 @@ impl OmegaScans {
 
 	fn manga(dto: SeriesDto) -> Option<Manga> {
 		let tags = dto.tags.into_iter().map(|tag| tag.name).collect::<Vec<_>>();
-		if is_blocked(&format!("{} {}", dto.title, tags.join(" "))) {
-			return None;
-		}
 		Some(Manga {
 			key: format!("{}#{}", dto.slug, dto.id),
 			title: dto.title,
@@ -155,9 +151,6 @@ impl OmegaScans {
 	}
 
 	fn query(query: &str, order_by: &str, page: i32) -> Result<MangaPageResult> {
-		if is_blocked(query) {
-			bail!("This search term is not supported.");
-		}
 		let mut params = QueryParameters::new();
 		params.push("query_string", Some(query));
 		params.push("status", Some("All"));

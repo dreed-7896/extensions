@@ -9,7 +9,6 @@ use aidoku::{
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
 	PageContent, Result, Source, UpdateStrategy,
 };
-use midoku_madara::is_blocked;
 use serde::Deserialize;
 
 const BASE_URL: &str = "https://doujins.com";
@@ -61,7 +60,7 @@ impl Doujins {
 							.and_then(|item| item.text())?
 							.trim()
 							.to_owned();
-						if title.is_empty() || is_blocked(&title) {
+						if title.is_empty() {
 							return None;
 						}
 						let href = element.attr("abs:href").or_else(|| element.attr("href"))?;
@@ -113,15 +112,6 @@ impl Doujins {
 			.folders
 			.into_iter()
 			.filter_map(|folder| {
-				let tag_text = folder
-					.tags
-					.iter()
-					.map(|tag| tag.tag.as_str())
-					.collect::<Vec<_>>()
-					.join(" ");
-				if is_blocked(&format!("{} {}", folder.name, tag_text)) {
-					return None;
-				}
 				let absolute_url = Self::absolute_url(&folder.link);
 				Some(Manga {
 					key: absolute_url
@@ -158,9 +148,6 @@ impl Source for Doujins {
 		let Some(query) = query.filter(|query| !query.trim().is_empty()) else {
 			return Self::popular(page);
 		};
-		if is_blocked(&query) {
-			bail!("This search term is not supported.");
-		}
 		let mut params = QueryParameters::new();
 		params.push("words", Some(&query));
 		params.push("page", Some(&page.to_string()));
@@ -195,10 +182,6 @@ impl Source for Doujins {
 		manga.status = MangaStatus::Completed;
 		manga.update_strategy = UpdateStrategy::Never;
 		manga.content_rating = ContentRating::NSFW;
-		let tags = manga.tags.as_ref().map(|value| value.join(" ")).unwrap_or_default();
-		if is_blocked(&format!("{} {tags}", manga.title)) {
-			bail!("This title is not supported.");
-		}
 		if needs_chapters {
 			manga.chapters = Some(vec![Chapter {
 				key: manga.key.clone(),

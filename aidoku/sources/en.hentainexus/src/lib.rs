@@ -10,7 +10,6 @@ use aidoku::{
 	PageContent, Result, Source, UpdateStrategy,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use midoku_madara::is_blocked;
 use serde_json::Value;
 
 const BASE_URL: &str = "https://hentainexus.com";
@@ -41,7 +40,7 @@ impl HentaiNexus {
 							.text()?
 							.trim()
 							.to_owned();
-						if title.is_empty() || is_blocked(&title) {
+						if title.is_empty() {
 							return None;
 						}
 						let cover = element
@@ -138,9 +137,6 @@ impl Source for HentaiNexus {
 		_filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
 		let query = query.unwrap_or_default();
-		if is_blocked(&query) {
-			bail!("This search term is not supported.");
-		}
 		let page_path = if page > 1 {
 			format!("/page/{page}")
 		} else {
@@ -201,11 +197,6 @@ impl Source for HentaiNexus {
 		manga.update_strategy = UpdateStrategy::Never;
 		manga.content_rating = ContentRating::NSFW;
 		manga.url = Some(url);
-
-		let tags = manga.tags.as_ref().map(|value| value.join(" ")).unwrap_or_default();
-		if is_blocked(&format!("{} {tags}", manga.title)) {
-			bail!("This title is not supported.");
-		}
 
 		if needs_chapters {
 			let id = manga.key.trim_matches('/').split('/').next_back().unwrap_or(&manga.key);

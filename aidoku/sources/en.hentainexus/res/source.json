@@ -2,7 +2,7 @@
 	"info": {
 		"id": "en.hentainexus",
 		"name": "HentaiNexus",
-		"version": 2,
+		"version": 3,
 		"minAppVersion": "0.7.1",
 		"url": "https://hentainexus.com",
 		"contentRating": 2,

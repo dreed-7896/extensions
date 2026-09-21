@@ -9,8 +9,6 @@ use aidoku::{
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
 	PageContent, Result, Source, UpdateStrategy,
 };
-use midoku_madara::is_blocked;
-
 const BASE_URL: &str = "https://hentai2read.com";
 const IMAGE_BASE_URL: &str = "https://static.hentai.direct/hentai";
 
@@ -54,7 +52,7 @@ impl Hentai2Read {
 							.or_else(|| link.text())?
 							.trim()
 							.to_owned();
-						if title.is_empty() || is_blocked(&title) {
+						if title.is_empty() {
 							return None;
 						}
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
@@ -89,9 +87,6 @@ impl Hentai2Read {
 	}
 
 	fn search(query: &str, page: i32) -> Result<MangaPageResult> {
-		if is_blocked(query) {
-			bail!("This search term is not supported.");
-		}
 		let url = format!("{BASE_URL}/hentai-list/search/any/all/name-az/{page}/");
 		let mut body = QueryParameters::new();
 		body.push("cmd_wpm_wgt_mng_sch_sbm", Some("Search"));
@@ -187,14 +182,6 @@ impl Source for Hentai2Read {
 		manga.url = Some(url);
 		manga.content_rating = ContentRating::NSFW;
 		manga.update_strategy = UpdateStrategy::Always;
-		let searchable = format!(
-			"{} {}",
-			manga.title,
-			manga.tags.as_ref().map(|tags| tags.join(" ")).unwrap_or_default()
-		);
-		if is_blocked(&searchable) {
-			bail!("This title is not supported.");
-		}
 		if needs_chapters {
 			manga.chapters = Some(document
 				.select("ul.nav-chapters > li > div.media > a, ul.nav-chapters a.pull-left")

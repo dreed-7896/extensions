@@ -85,7 +85,7 @@ impl<I: Impl> Madara<I> {
 						let link = element
 							.select_first(".post-title a, a.manga-item__link, h3 a, h2 a")?;
 						let title = link.text()?.trim().to_owned();
-						if title.is_empty() || is_blocked(&title) {
+						if title.is_empty() {
 							return None;
 						}
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
@@ -119,9 +119,6 @@ impl<I: Impl> Madara<I> {
 
 		let mut query_params = aidoku::helpers::uri::QueryParameters::new();
 		if let Some(query) = query.filter(|query| !query.trim().is_empty()) {
-			if is_blocked(query) {
-				bail!("This search term is not supported.");
-			}
 			query_params.push("s", Some(query));
 			query_params.push("post_type", Some("wp-manga"));
 		}
@@ -237,16 +234,6 @@ impl<I: Impl> Source for Madara<I> {
 			.unwrap_or(MangaStatus::Unknown);
 		manga.url = Some(manga_url.clone());
 		manga.content_rating = ContentRating::NSFW;
-
-		let tags_text = manga.tags.as_ref().map(|tags| tags.join(" ")).unwrap_or_default();
-		if is_blocked(&format!(
-			"{} {} {}",
-			manga.title,
-			manga.description.as_deref().unwrap_or(""),
-			tags_text
-		)) {
-			bail!("This title is not supported.");
-		}
 
 		if needs_chapters {
 			let chapter_document = if self.params().ajax_chapters {
@@ -394,18 +381,4 @@ fn extract_number(value: &str) -> Option<f32> {
 		}
 	}
 	found.parse().ok()
-}
-
-pub fn is_blocked(value: &str) -> bool {
-	let value = value.to_ascii_lowercase();
-	[
-		"lolicon",
-		"shotacon",
-		" loli ",
-		" shota ",
-		"underage",
-		"minor character",
-	]
-	.iter()
-	.any(|term| value.contains(term))
 }
