@@ -9,7 +9,7 @@ use aidoku::{
 		vec::Vec,
 	},
 	helpers::uri::{QueryParameters, encode_uri_component},
-	imports::{defaults::defaults_get, html::Document, net::Request},
+	imports::{html::Document, net::Request},
 	prelude::*,
 	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout,
 	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, MangaStatus, Page,
@@ -18,6 +18,7 @@ use aidoku::{
 use serde_json::Value;
 
 const BASE_URL: &str = "https://imhentai.xxx";
+const USER_AGENT: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const CATEGORY_IDS: [&str; 6] = ["m", "d", "w", "i", "a", "g"];
 const LANGUAGE_FLAGS: [(&str, &str); 7] = [
 	("en", "en"),
@@ -47,25 +48,6 @@ impl IMHentai {
 
 	fn key_from_url(url: &str) -> String {
 		url.strip_prefix(BASE_URL).unwrap_or(url).into()
-	}
-
-	fn selected_language_code() -> Option<String> {
-		defaults_get::<String>("language")
-			.filter(|language| LANGUAGE_FLAGS.iter().any(|(code, _)| language == code))
-	}
-
-	fn language_slug() -> Option<&'static str> {
-		let language = Self::selected_language_code()?;
-		match language.as_str() {
-			"en" => Some("english"),
-			"ja" => Some("japanese"),
-			"es" => Some("spanish"),
-			"fr" => Some("french"),
-			"ko" => Some("korean"),
-			"de" => Some("german"),
-			"ru" => Some("russian"),
-			_ => None,
-		}
 	}
 
 	fn image_url(element: &aidoku::imports::html::Element) -> Option<String> {
@@ -145,17 +127,22 @@ impl IMHentai {
 		}
 	}
 
+	fn get_document(url: String) -> Result<Document> {
+		Ok(Request::get(url)?
+			.header("Accept-Encoding", "identity")
+			.header("User-Agent", USER_AGENT)
+			.header("Referer", BASE_URL)
+			.html()?)
+	}
+
 	fn browse(popular: bool, page: i32) -> Result<MangaPageResult> {
 		let mut url = String::from(BASE_URL);
 		url.push('/');
-		if let Some(language) = Self::language_slug() {
-			url.push_str(&format!("language/{language}/"));
-		}
 		if popular {
 			url.push_str("popular/");
 		}
 		url.push_str(&format!("?page={page}"));
-		Ok(Self::parse_cards(&Request::get(url)?.html()?))
+		Ok(Self::parse_cards(&Self::get_document(url)?))
 	}
 
 	fn push_advanced_terms(target: &mut Vec<String>, namespace: &str, value: &str) {
@@ -214,12 +201,9 @@ impl IMHentai {
 
 		if speechless {
 			let path = if sort_index == 0 { "popular/" } else { "" };
-			return Ok(Self::parse_cards(
-				&Request::get(format!(
-					"{BASE_URL}/language/speechless/{path}?page={page}"
-				))?
-				.html()?,
-			));
+			return Ok(Self::parse_cards(&Self::get_document(format!(
+				"{BASE_URL}/language/speechless/{path}?page={page}"
+			))?));
 		}
 
 		let mut parameters = QueryParameters::new();
@@ -247,22 +231,8 @@ impl IMHentai {
 			);
 		}
 
-		let language = Self::selected_language_code();
-		for (code, flag) in LANGUAGE_FLAGS {
-			parameters.push(
-				flag,
-				Some(
-					if language
-						.as_deref()
-						.map(|selected| selected == code)
-						.unwrap_or(true)
-					{
-						"1"
-					} else {
-						"0"
-					},
-				),
-			);
+		for (_, flag) in LANGUAGE_FLAGS {
+			parameters.push(flag, Some("1"));
 		}
 
 		let key = if advanced_terms.is_empty() {
@@ -283,8 +253,24 @@ impl IMHentai {
 		parameters.push("page", Some(&page.to_string()));
 
 		let url = format!("{BASE_URL}/search/?{parameters}");
-		let document = Request::get(url)?.html()?;
-		let result = Self::parse_cards(&document);
+		let document = Self::get_document(url.clone())?;
+		let mut result = Self::parse_cards(&document);
+		// IMHentai treats spaces as an exact phrase. If that returns nothing,
+		// retry the words as comma-separated AND terms, which matches the
+		// working GalleryAdults behavior for broader multi-word searches.
+		if result.entries.is_empty()
+			&& advanced_terms.is_empty()
+			&& query.split_whitespace().count() > 1
+		{
+			let fallback_key = query
+				.split_whitespace()
+				.map(|term| encode_uri_component(term))
+				.collect::<Vec<_>>()
+				.join(",");
+			parameters.set_encoded("key", Some(&fallback_key));
+			let fallback_url = format!("{BASE_URL}/search/?{parameters}");
+			result = Self::parse_cards(&Self::get_document(fallback_url)?);
+		}
 		if result.entries.is_empty() {
 			let overloaded = document
 				.select_first("body")
@@ -358,7 +344,7 @@ impl Source for IMHentai {
 		needs_chapters: bool,
 	) -> Result<Manga> {
 		let url = Self::absolute_url(&manga.key);
-		let document = Request::get(&url)?.html()?;
+		let document = Self::get_document(url.clone())?;
 		let info = document
 			.select_first(".gallery_first")
 			.ok_or_else(|| {
@@ -402,7 +388,7 @@ impl Source for IMHentai {
 				title: Some("Chapter".into()),
 				chapter_number: Some(1.0),
 				url: Some(url),
-				language: Self::selected_language_code(),
+				language: Some("multi".into()),
 				..Default::default()
 			}]);
 		}
@@ -410,7 +396,7 @@ impl Source for IMHentai {
 	}
 
 	fn get_page_list(&self, _manga: Manga, chapter: Chapter) -> Result<Vec<Page>> {
-		let document = Request::get(Self::absolute_url(&chapter.key))?.html()?;
+		let document = Self::get_document(Self::absolute_url(&chapter.key))?;
 		let script = document.select("script").and_then(|elements| {
 			elements
 				.filter_map(|element| element.data())

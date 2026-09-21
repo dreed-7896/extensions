@@ -2,17 +2,16 @@
 	"info": {
 		"id": "multi.imhentai",
 		"name": "IMHentai",
-		"version": 4,
+		"version": 5,
 		"url": "https://imhentai.xxx",
 		"contentRating": 2,
-		"languages": ["All", "en", "ja", "es", "fr", "ko", "de", "ru"]
+		"languages": ["multi"]
 	},
 	"listings": [
 		{"id": "popular", "name": "Popular"},
 		{"id": "latest", "name": "Latest"}
 	],
 	"config": {
-		"languageSelectType": "single",
 		"supportsAuthorSearch": true,
 		"supportsTagSearch": true
 	}
