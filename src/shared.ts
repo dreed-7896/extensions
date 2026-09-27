@@ -69,3 +69,14 @@ export function chaptersFrom(nodes: HTMLElement[], base: string): Chapter[] {
 export const assertOk = (status: number, url: string) => {
   if (status < 200 || status >= 300) throw new Error(`HTTP ${status} loading ${url}`);
 };
+
+// Some Cloudflare setups send a challenge with HTTP 200. Treat its HTML as a
+// challenge so Suwatte can open its native resolution view instead of parsing
+// it as an empty catalog or a blank title.
+export const checkedHtml = (html: string, resolutionURL: string): string => {
+  if (/<title[^>]*>\s*(?:just a moment|attention required)/i.test(html)
+    || /(?:cdn-cgi\/challenge-platform|cf-chl-|challenges\.cloudflare\.com)/i.test(html)) {
+    throw new CloudflareError(resolutionURL);
+  }
+  return html;
+};

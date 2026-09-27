@@ -6,7 +6,7 @@ import {
   type Chapter, type ChapterPage, type Content, type HomePage, type Item,
   type ItemListRequest, type PagedItemList, type SearchRequest, type SourceInfo,
 } from "@suwatte/toolchain/types";
-import { absolute, assertOk, chaptersFrom, document, href, idFrom, image, pageResult, pathFrom, text } from "../../shared";
+import { absolute, assertOk, chaptersFrom, checkedHtml, document, href, idFrom, image, pageResult, pathFrom, text } from "../../shared";
 
 const BASE = "https://novelcrow.com";
 
@@ -33,7 +33,7 @@ export function protectedImages(html: string): string[] {
 
 export default class NovelCrow {
   static info: SourceInfo = {
-    id: "en.novelcrow", name: "NovelCrow", version: 3,
+    id: "en.novelcrow", name: "NovelCrow", version: 4,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
@@ -45,7 +45,7 @@ export default class NovelCrow {
   private async html(path: string): Promise<string> {
     const response = await this.client.get(path);
     assertOk(response.status, absolute(path, BASE));
-    return response.text();
+    return checkedHtml(await response.text(), `${BASE}/`);
   }
   private items(html: string, page: number): PagedItemList {
     const root = document(html);

@@ -13611,7 +13611,7 @@ var SourcePackage = (() => {
       init_Buffer();
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
-      exports.assertOk = exports.pageResult = exports.idFrom = exports.text = exports.image = exports.href = exports.absolute = exports.pathFrom = exports.document = exports.adult = void 0;
+      exports.checkedHtml = exports.assertOk = exports.pageResult = exports.idFrom = exports.text = exports.image = exports.href = exports.absolute = exports.pathFrom = exports.document = exports.adult = void 0;
       exports.chaptersFrom = chaptersFrom;
       var node_html_parser_1 = require_dist();
       var types_1 = require_types();
@@ -13704,6 +13704,13 @@ var SourcePackage = (() => {
           throw new Error(`HTTP ${status} loading ${url}`);
       };
       exports.assertOk = assertOk;
+      var checkedHtml = (html, resolutionURL) => {
+        if (/<title[^>]*>\s*(?:just a moment|attention required)/i.test(html) || /(?:cdn-cgi\/challenge-platform|cf-chl-|challenges\.cloudflare\.com)/i.test(html)) {
+          throw new CloudflareError(resolutionURL);
+        }
+        return html;
+      };
+      exports.checkedHtml = checkedHtml;
     }
   });
 
@@ -13754,7 +13761,7 @@ var SourcePackage = (() => {
         async html(path) {
           const response = await this.client.get(path);
           (0, shared_1.assertOk)(response.status, (0, shared_1.absolute)(path, BASE));
-          return response.text();
+          return (0, shared_1.checkedHtml)(await response.text(), `${BASE}/`);
         }
         items(html, page) {
           const root = (0, shared_1.document)(html);
@@ -13837,7 +13844,7 @@ var SourcePackage = (() => {
       __publicField(NovelCrow, "info", {
         id: "en.novelcrow",
         name: "NovelCrow",
-        version: 3,
+        version: 4,
         website: BASE,
         languages: ["en"],
         rating: types_1.ContentRating.MATURE,
@@ -13855,7 +13862,7 @@ var SourcePackage = (() => {
       var runtime = require_runtime();
       var sourceModule = require_novelcrow();
       var cls = runtime.resolveDefaultExport(sourceModule);
-      exports.SourceMetadata = { "id": "en.novelcrow", "name": "NovelCrow", "version": 3, "website": "https://novelcrow.com", "languages": ["en"], "rating": 2, "minSupportedAppVersion": "7.0.0" };
+      exports.SourceMetadata = { "id": "en.novelcrow", "name": "NovelCrow", "version": 4, "website": "https://novelcrow.com", "languages": ["en"], "rating": 2, "minSupportedAppVersion": "7.0.0" };
       exports.SourceConfiguration = null;
       exports.bootstrap = function bootstrap() {
         var args = null;

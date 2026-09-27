@@ -6973,7 +6973,7 @@ var SourcePackage = (() => {
       init_Buffer();
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
-      exports.assertOk = exports.pageResult = exports.idFrom = exports.text = exports.image = exports.href = exports.absolute = exports.pathFrom = exports.document = exports.adult = void 0;
+      exports.checkedHtml = exports.assertOk = exports.pageResult = exports.idFrom = exports.text = exports.image = exports.href = exports.absolute = exports.pathFrom = exports.document = exports.adult = void 0;
       exports.chaptersFrom = chaptersFrom;
       var node_html_parser_1 = require_dist();
       var types_1 = require_types();
@@ -7066,6 +7066,13 @@ var SourcePackage = (() => {
           throw new Error(`HTTP ${status} loading ${url}`);
       };
       exports.assertOk = assertOk;
+      var checkedHtml = (html, resolutionURL) => {
+        if (/<title[^>]*>\s*(?:just a moment|attention required)/i.test(html) || /(?:cdn-cgi\/challenge-platform|cf-chl-|challenges\.cloudflare\.com)/i.test(html)) {
+          throw new CloudflareError(resolutionURL);
+        }
+        return html;
+      };
+      exports.checkedHtml = checkedHtml;
     }
   });
 

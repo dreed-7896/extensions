@@ -4,6 +4,7 @@ const vm = require('node:vm');
 const { buildSync } = require('esbuild');
 const CryptoJS = require('crypto-js');
 const { ContentSchema, ChapterSchema, PagedItemListSchema, ChapterPageSchema, HomePageSchema } = require('@suwatte/toolchain/validate');
+global.CloudflareError = require('@suwatte/toolchain/emulator').CloudflareError;
 
 function load(entry) {
   const code = buildSync({ entryPoints: [entry], bundle: true, platform: 'node', format: 'cjs', write: false }).outputFiles[0].text;
@@ -38,8 +39,13 @@ const cipher = CryptoJS.AES.encrypt(JSON.stringify(['/page-1.jpg']), 'nonce-exam
 pages.set(`${BASE_C}/comic/sample/chapter-1/`, `<script>var nonce='nonce-example'; var chapter_data='${cipher}';</script>`);
 const BASE_H = 'https://hentairead.com';
 pages.set(`${BASE_H}/?s=&title-type=contains&sortby=latest`, `<div class="manga-item"><h3><a href="/hentai/sample/">Sample</a></h3><img src="/cover.jpg"></div>`);
+pages.set(`${BASE_H}/hentai/?sortby=latest`, `<div class="manga-grid"><div class="manga-item"><h3><a href="/hentai/gallery/" title="Gallery"><svg></svg></a></h3><img alt="Gallery" src="/gallery-cover.jpg"></div></div>`);
 pages.set(`${BASE_H}/hentai/sample/`, `<div class="manga-titles"><h1>Sample</h1></div><meta property="og:image" content="/cover.jpg"><li class="wp-manga-chapter"><a href="/hentai/sample/chapter-1/">Chapter 1</a></li>`);
 pages.set(`${BASE_H}/hentai/sample/chapter-1/`, `<div class="reading-content"><img data-src="/page-1.jpg"></div>`);
+pages.set(`${BASE_H}/hentai/gallery/p/1/`, `<div class="chapter-image-item"><img data-src="https://hencover.xyz/preview/gallery/01.jpg"></div>`);
+pages.set(`${BASE_H}/hentai/gallery/`, `<meta property="og:title" content="Gallery"><meta name="description" content="Gallery description"><meta property="og:image" content="/gallery-cover.jpg">`);
+pages.set(`${BASE_H}/hentai/json/p/1/`, `<script id="single-chapter-js-extra">var pagesData={"data":{"chapter":{"images":[{"src":"/json-page.jpg"}]}}};</script>`);
+pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
 
 (async () => {
   for (const [entry, id] of [
@@ -87,6 +93,25 @@ pages.set(`${BASE_H}/hentai/sample/chapter-1/`, `<div class="reading-content"><i
     assert.equal((await source.getChapterPages(id, chapters[0].id)).length, 1);
     console.log(`PASS bundled ${name}`);
   }
+  const HentaiRead = load('src/sources/hentairead/index.ts');
+  const hentaiRead = new HentaiRead();
+  assert.equal((await hentaiRead.getItemList({ key: 'recent' }, 1)).items[0].title, 'Gallery');
+  assert.equal((await hentaiRead.getContent('hentai/gallery')).title, 'Gallery');
+  assert.equal((await hentaiRead.getContent('hentai/gallery')).summary, 'Gallery description');
+  assert.equal((await hentaiRead.getContent('hentai/gallery')).coverImage, `${BASE_H}/gallery-cover.jpg`);
+  const galleryChapter = (await hentaiRead.getChapters('hentai/gallery'))[0];
+  assert.equal(galleryChapter.id, '/hentai/gallery/p/1/');
+  assert.equal((await hentaiRead.getChapterPages('hentai/gallery', galleryChapter.id))[0].url, 'https://henread.xyz/gallery/01.jpg');
+  assert.equal((await hentaiRead.getChapterPages('hentai/json', '/hentai/json/p/1/'))[0].url, `${BASE_H}/json-page.jpg`);
+  console.log('PASS HentaiRead gallery reader and metadata');
+  const challenge = '<html><title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/main.js"></script></html>';
+  pages.set(`${BASE_C}/?s=&post_type=wp-manga`, challenge);
+  pages.set(`${BASE_H}/?s=&title-type=contains&sortby=latest`, challenge);
+  for (const [Source, url] of [[load('src/sources/novelcrow/index.ts'), BASE_C], [HentaiRead, BASE_H]]) {
+    await assert.rejects(new Source().getSearchResults({}, 1), (error) =>
+      error.name === 'CloudflareError' && error.resolutionURL === `${url}/`);
+  }
+  console.log('PASS HTTP 200 Cloudflare challenge handling');
   const catalog = JSON.parse(fs.readFileSync('dist/sources.json', 'utf8'));
   const readme = fs.readFileSync('README.md', 'utf8');
   const baseUrl = readme.match(/https:\/\/raw\.githubusercontent\.com\/[^\s]+\/dist\b/)?.[0];
