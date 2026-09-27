@@ -1,148 +1,388 @@
 "use httpclient";
 
 import {
-  ContentRating, ContentStatus, ContentType, ReadingMode,
-  type Chapter, type ChapterPage, type Content, type HomePage, type Item,
-  type ItemListRequest, type PagedItemList, type SearchRequest, type SourceInfo,
+  SearchFilter,
+  SelectFilter,
+  TextFilter,
+  UIWebViewButton,
+  type Chapter,
+  type ChapterPage,
+  type Content,
+  type HomePage,
+  type ItemListRequest,
+  type NetworkRequest,
+  type PagedItemList,
+  type SearchRequest,
+  type SortOptions,
+  type SourceConfiguration,
+  type SourceInfo,
+  type UIForm,
 } from "@suwatte/toolchain/types";
-import { absolute, assertOk, chaptersFrom, checkedHtml, document, href, idFrom, image, pageResult, pathFrom, text } from "../../shared";
+import { ContentRating } from "@suwatte/toolchain/types";
+import { createProtectedClient } from "../_shared/client";
+import {
+  assertCloudflareCleared,
+  cloudflareFromHeaders,
+  looksLikeCloudflare,
+  throwCloudflare,
+} from "../_shared/cloudflare";
+import { withQuery } from "../_shared/http";
+import {
+  BASE,
+  CF_RESOLVE,
+  IMAGE_ACCEPT,
+  SORTS,
+  TEXT_FILTERS,
+  TYPES,
+} from "./constants";
+import {
+  contentUrl,
+  hasNextPage,
+  listingUrl,
+  parseChapterPages,
+  parseDetails,
+  parsePageRange,
+  parseListing,
+  readerLanguageOrder,
+  readerUrl,
+  searchUrl,
+} from "./parse";
 
-const BASE = "https://hentairead.com";
-const titleOf = (node: ReturnType<ReturnType<typeof document>["querySelector"]>) =>
-  text(node) || node?.getAttribute("title")?.trim() || node?.getAttribute("aria-label")?.trim()
-  || node?.querySelector("img")?.getAttribute("alt")?.trim() || "";
+type TermResult = { results?: Array<{ id: number; text: string }> };
 
-// HentaiRead serves some images from a separate reader CDN. Its cover CDN's
-// /preview/ image is only a thumbnail, even if the URL points to a full page.
-const readerImage = (url: string) => url.replace(/^https?:\/\/hencover\.xyz\//i, "https://henread.xyz/")
-  .replace(/^(https?:\/\/henread\.xyz\/)(?:preview\/)/i, "$1");
-
-const embeddedPages = (raw: string): string[] => {
-  const urls: string[] = [];
-  for (const assignment of raw.matchAll(/\b(?:pagesData|pages_data|chapter_data)\s*[:=]\s*/gi)) {
-    const start = assignment.index + assignment[0].length;
-    if (raw[start] !== "{") continue;
-    let depth = 0;
-    let quoted = false;
-    let escaped = false;
-    let end = start;
-    for (; end < raw.length; end++) {
-      const character = raw[end];
-      if (escaped) { escaped = false; continue; }
-      if (quoted && character === "\\") { escaped = true; continue; }
-      if (character === '"') { quoted = !quoted; continue; }
-      if (!quoted && character === "{") depth++;
-      if (!quoted && character === "}" && --depth === 0) { end++; break; }
-    }
-    try {
-      const value: unknown = JSON.parse(raw.slice(start, end));
-      const collect = (item: unknown): void => {
-        if (!item || typeof item !== "object") return;
-        if (Array.isArray(item)) { item.forEach(collect); return; }
-        const record = item as Record<string, unknown>;
-        if (typeof record.src === "string") urls.push(record.src);
-        for (const key of ["data", "chapter", "images", "pages"]) collect(record[key]);
-      };
-      collect(value);
-    } catch { /* Other site scripts can assign JavaScript objects rather than JSON. */ }
-  }
-  return urls;
+const TAXONOMY: Record<string, string> = {
+  artist: "manga_artist",
+  manga_tag: "manga_tag",
 };
 
-const scriptImages = (html: string) => {
-  const root = document(html);
-  const scripts = root.querySelectorAll("#single-chapter-js-extra, #single-chapter-js-before, script");
-  const addresses: string[] = [];
-  for (const script of scripts) {
-    const raw = script.text.replace(/\\\//g, "/").replace(/&amp;/g, "&");
-    for (const url of embeddedPages(raw)) addresses.push(absolute(url, BASE));
-    for (const match of raw.matchAll(/https?:\/\/[^\s"'<>\\]+\.(?:jpe?g|png|webp|gif)(?:\?[^\s"'<>\\]*)?/gi))
-      if (!/\b(?:logo|avatar|spinner|placeholder|icon|tracking|pixel)\b/i.test(match[0])) addresses.push(match[0]);
-  }
-  return [...new Set(addresses.filter(Boolean))];
+const isImageRequest = (url: string): boolean =>
+  /hencover\.|henread\.|\/wp-content\/uploads\//i.test(url) ||
+  /\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(url);
+
+const isCloudflareError = (error: unknown): boolean => {
+  const name = String((error as { name?: string })?.name ?? "");
+  const message = String((error as { message?: string })?.message ?? error);
+  return (
+    name.includes("Cloudflare") ||
+    message.includes("Cloudflare") ||
+    message.includes("cloudflare")
+  );
 };
 
-export default class HentaiRead {
+const cloudflareFromThrown = (error: unknown): boolean => {
+  if (isCloudflareError(error)) return true;
+  const response = (error as { response?: { status?: number; headers?: unknown } })
+    .response;
+  if (!response) return false;
+  return cloudflareFromHeaders(response.status ?? 0, response.headers as never);
+};
+
+/**
+ * Documented CF path: https://suwatte.app/developers/networking/
+ * `"use httpclient"` + owned HttpClient + cloudflareResolutionURL.
+ * Native client throws CloudflareError; cookies attach to this client after
+ * Resolve. Do not swallow non-2xx with a status validator — that skips native
+ * CF throws.
+ *
+ * Keiyoushi has no CF code — Mihon's interceptor is app-side. Same split here.
+ * Nested listing URL: WKWebView often blanks on `/`.
+ */
+export default class Target {
+  client = (() => {
+    const http = createProtectedClient(CF_RESOLVE, { Referer: `${BASE}/` });
+    http.interceptors.request.use((request) => {
+      if (isImageRequest(request.url)) {
+        request.headers.set("Accept", IMAGE_ACCEPT);
+        request.headers.set("Referer", `${BASE}/`);
+      }
+      return request;
+    });
+    return http;
+  })();
+
   static info: SourceInfo = {
-    id: "en.hentairead", name: "HentaiRead", version: 4,
-    website: BASE, languages: ["en"], rating: ContentRating.MATURE,
-    minSupportedAppVersion: "7.0.0",
+    id: "en.hentairead",
+    name: "HentaiRead",
+    version: 5,
+    website: BASE,
+    thumbnail: "hentairead.png",
+    languages: ["en"],
+    rating: ContentRating.MATURE,
   };
-  client = new HttpClient({ baseUrl: BASE, rateLimit: { permits: 2, period: 1 },
-    cloudflareResolutionURL: `${BASE}/`,
-    headers: { Referer: `${BASE}/` },
+
+  getConfiguration = (): SourceConfiguration =>
+    ({
+      imageReferer: `${BASE}/`,
+      cloudflareResolutionURL: CF_RESOLVE,
+      useClientForImageRequests: true,
+    }) as SourceConfiguration;
+
+  getSettingsPage = async (): Promise<UIForm> => ({
+    sections: [
+      {
+        header: "Cloudflare",
+        footer:
+          "Same path as NovelCrow: open the source so Resolve runs, complete the check, then the Latest tab loads. Availability still aborts on CF by design. If Latest stays on grey tiles after Resolve: Settings → Advanced → Clear Network Cache, Open Challenge Page, pull to refresh. Safari cookies are not this source's jar.",
+        views: [
+          UIWebViewButton({
+            title: "Open Challenge Page",
+            url: { url: CF_RESOLVE },
+          }),
+        ],
+      },
+    ],
   });
-  getConfiguration() { return { imageReferer: `${BASE}/`, cloudflareResolutionURL: `${BASE}/`, useClientForImageRequests: true }; }
-  private async html(path: string): Promise<string> {
-    const response = await this.client.get(path); assertOk(response.status, absolute(path, BASE));
-    return checkedHtml(await response.text(), `${BASE}/`);
-  }
-  private listing(html: string, page: number): PagedItemList {
-    const root = document(html);
-    const entries = new Map<string, Item>();
-    for (const node of root.querySelectorAll(".manga-grid .manga-item, .manga-item")) {
-      const link = node.querySelector("h3 a[href*='/hentai/'], a.manga-item__link, a[href*='/hentai/']");
-      const url = href(link, BASE);
-      if (!url || !pathFrom(url).startsWith("/hentai/")) continue;
-      const id = idFrom(url, BASE);
-      const title = titleOf(link) || titleOf(node.querySelector("h3")) || node.querySelector("img")?.getAttribute("alt")?.trim() || "";
-      if (!title) continue;
-      entries.set(id, { id, title,
-        coverImage: image(node.querySelector("img.manga-item__img-inner, img"), BASE),
-        webUrl: url, rating: ContentRating.MATURE });
+
+  willRequestImage = async (
+    request: NetworkRequest,
+  ): Promise<NetworkRequest> => ({
+    ...request,
+    headers: {
+      ...(request.headers ?? {}),
+      Accept: IMAGE_ACCEPT,
+      Referer: `${BASE}/`,
+    },
+  });
+
+  private getHtml = async (
+    url: string,
+    referer = `${BASE}/`,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<string> => {
+    try {
+      const response = await this.client.get(url, {
+        headers: { Referer: referer, ...extraHeaders },
+      });
+      if (cloudflareFromHeaders(response.status, response.headers)) {
+        throwCloudflare(CF_RESOLVE);
+      }
+      const body = await response.text();
+      if (looksLikeCloudflare(body)) throwCloudflare(CF_RESOLVE);
+      if (!response.ok) {
+        throw new Error(`GET ${url} failed (${response.status})`);
+      }
+      return body;
+    } catch (error) {
+      if (cloudflareFromThrown(error)) throwCloudflare(CF_RESOLVE);
+      const response = (
+        error as {
+          response?: {
+            status?: number;
+            headers?: unknown;
+            text?: () => Promise<string>;
+          };
+        }
+      ).response;
+      if (response) {
+        const body = (await response.text?.().catch(() => "")) ?? "";
+        if (
+          looksLikeCloudflare(body) ||
+          cloudflareFromHeaders(response.status ?? 0, response.headers as never)
+        ) {
+          throwCloudflare(CF_RESOLVE);
+        }
+      }
+      throw error;
     }
-    return pageResult([...entries.values()], root, page);
-  }
-  async getSearchResults(request: SearchRequest, page: number): Promise<PagedItemList> {
-    const query = request.query?.trim() ?? "";
-    const path = `${page > 1 ? `/page/${page}/` : "/"}?s=${encodeURIComponent(query)}&title-type=contains&sortby=latest`;
-    return this.listing(await this.html(path), page);
-  }
-  async getHomePage(): Promise<HomePage> {
-    return { feeds: [
-      { id: "recent", title: "Recently added", content: { list: { key: "recent" } } },
-      { id: "popular", title: "Popular", content: { list: { key: "popular" } } },
-    ] };
-  }
-  async getItemList(request: ItemListRequest, page: number): Promise<PagedItemList> {
-    const sort = request.key === "popular" ? "views" : "latest";
-    const path = `/hentai/${page > 1 ? `page/${page}/` : ""}?sortby=${sort}`;
-    return this.listing(await this.html(path), page);
-  }
-  async getContent(contentId: string): Promise<Content> {
-    const url = absolute(`/${contentId.replace(/^\/+|\/+$/g, "")}/`, BASE);
-    const root = document(await this.html(url));
-    const heading = root.querySelector(".manga-titles h1, .manga-title h1, h1");
-    const title = titleOf(heading) || root.querySelector("meta[property='og:title'], meta[name='twitter:title']")?.getAttribute("content")?.trim()
-      || contentId.split("/").filter(Boolean).pop()?.replace(/-/g, " ") || "";
-    return { title,
-      coverImage: image(root.querySelector("img[fetchpriority='high'], .summary_image img"), BASE)
-        || absolute(root.querySelector("meta[property='og:image'], meta[name='twitter:image']")?.getAttribute("content") ?? undefined, BASE)
-        || image(root.querySelector(".manga-cover img, .manga-image img, .manga-item img"), BASE),
-      rating: ContentRating.MATURE, webUrl: url,
-      contentType: ContentType.MANGA, readingMode: ReadingMode.PAGED_MANGA,
-      status: ContentStatus.UNKNOWN,
-      summary: text(root.querySelector(".description-summary, .summary__content, .manga-description, #mangaDescription, .description"))
-        || root.querySelector("meta[name='description'], meta[property='og:description']")?.getAttribute("content")?.trim() || "",
-      ...(() => { const genres = root.querySelectorAll("a[href*='/genre/'], a[href*='/tag/']")
-        .map((n) => ({ id: text(n), title: text(n) })).filter((tag) => tag.title);
-        return genres.length ? { genres } : {}; })(),
+  };
+
+  private failEmptyListing = (html: string): never => {
+    if (looksLikeCloudflare(html)) throwCloudflare(CF_RESOLVE);
+    const title =
+      html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() ??
+      "";
+    throw new Error(
+      `HentaiRead listing parsed 0 titles (${html.length} bytes${title ? `, ${title.slice(0, 80)}` : ""}). Clear Network Cache, Open Challenge Page, retry.`,
+    );
+  };
+
+  getHomePage = async (): Promise<HomePage> => {
+    // NovelCrow: probe before feeds so Resolve runs *before* Latest paints
+    // skeletons. Empty getHomePage + CF on getItemList left the grid loading.
+    await assertCloudflareCleared(this.client, CF_RESOLVE);
+    return {
+      feeds: [
+        {
+          id: "latest",
+          title: "Latest",
+          content: { list: { key: "latest", disableSorting: true } },
+        },
+        {
+          id: "popular",
+          title: "Popular",
+          content: { list: { key: "popular", disableSorting: true } },
+        },
+      ],
     };
-  }
-  async getChapters(contentId: string): Promise<Chapter[]> {
-    const root = document(await this.html(`/${contentId.replace(/^\/+|\/+$/g, "")}/`));
-    const links = root.querySelectorAll("li.wp-manga-chapter a, .chapter-item a, .listing-chapters_wrap a[href*='/chapter-'], a[href*='/p/1/']");
-    const chapters = chaptersFrom(links, BASE);
-    // Galleries with no chapter list have a dedicated /p/1/ reading route.
-    return chapters.length ? chapters : [{ id: `/${contentId.replace(/^\/+|\/+$/g, "")}/p/1/`, index: 0, number: 1, title: "Complete gallery", language: "en" }];
-  }
-  async getChapterPages(_contentId: string, chapterId: string): Promise<ChapterPage[]> {
-    const html = await this.html(chapterId);
-    const root = document(html);
-    const images = root.querySelectorAll(".chapter-image-item img, .reading-content img, img.wp-manga-chapter-img");
-    const urls = images.map((node) => image(node, BASE)).filter(Boolean);
-    const pages = urls.length ? [...new Set(urls)] : scriptImages(html);
-    if (!pages.length) throw new Error("HentaiRead returned no reader images");
-    return pages.map((url) => ({ url: readerImage(url) }));
-  }
+  };
+
+  getSortOptions = async (): Promise<SortOptions> => ({
+    options: [...SORTS],
+    disableOrdering: false,
+  });
+
+  getSearchFilters = async () => [
+    SearchFilter(
+      "types",
+      "Types",
+      SelectFilter(
+        TYPES.map((type) => ({ id: type.id, title: type.title })),
+        false,
+      ),
+    ),
+    ...TEXT_FILTERS.map((filter) =>
+      SearchFilter(filter.id, filter.name, TextFilter(), filter.hint),
+    ),
+    SearchFilter(
+      "uploaded",
+      "Uploaded",
+      TextFilter(),
+      "Year filter, e.g. >2024",
+    ),
+    SearchFilter("pages", "Pages", TextFilter(), "Page count filter, e.g. >20"),
+  ];
+
+  getItemList = async (
+    request: ItemListRequest,
+    page: number,
+  ): Promise<PagedItemList> => {
+    const sortby = request.key === "popular" ? "views" : "new";
+    const html = await this.getHtml(listingUrl(page, sortby));
+    const items = parseListing(html);
+    if (!items.length) this.failEmptyListing(html);
+    return { items, isLastPage: !hasNextPage(html) };
+  };
+
+  getSearchResults = async (
+    request: SearchRequest,
+    page: number,
+  ): Promise<PagedItemList> => {
+    const filters = request.filters ?? {};
+    const pairs: [string, string][] = [
+      ["s", request.query?.trim() ?? ""],
+      ["title-type", "contains"],
+      ["sortby", request.sort?.key ?? "new"],
+      ["order", request.sort?.ascending ? "asc" : "desc"],
+    ];
+
+    const types = filters.types as { include?: string[] } | undefined;
+    for (const value of types?.include ?? []) {
+      pairs.push(["categories[]", value]);
+    }
+
+    for (const filter of TEXT_FILTERS) {
+      const raw = (filters[filter.id] as string | undefined)?.trim();
+      if (!raw) continue;
+      for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
+        const exclude = part.startsWith("-");
+        const name = exclude ? part.slice(1).trim() : part;
+        const id = await this.getTagId(name, filter.type);
+        if (id == null) {
+          throw new Error(
+            `${filter.name.replace(/s$/, "")} not found: ${name}`,
+          );
+        }
+        if (filter.type === "manga_tag") {
+          pairs.push([exclude ? "excluding[]" : "including[]", String(id)]);
+        } else {
+          pairs.push([`${filter.type}s[]`, String(id)]);
+        }
+      }
+    }
+
+    const uploaded = (filters.uploaded as string | undefined)?.trim();
+    if (uploaded) {
+      const kind =
+        uploaded[0] === ">" ? "after" : uploaded[0] === "<" ? "before" : "in";
+      pairs.push(["release-type", kind]);
+      pairs.push(["release", uploaded.replace(/\D/g, "")]);
+    }
+
+    const pages = (filters.pages as string | undefined)?.trim();
+    if (pages) {
+      const [min, max] = parsePageRange(pages);
+      pairs.push(["pages", `${min}-${max}`]);
+    }
+
+    const html = await this.getHtml(searchUrl(page, pairs));
+    const items = parseListing(html);
+    return { items, isLastPage: !hasNextPage(html) || items.length === 0 };
+  };
+
+  getContent = async (contentId: string): Promise<Content> => {
+    const html = await this.getHtml(contentUrl(contentId));
+    return parseDetails(html, contentId);
+  };
+
+  getChapters = async (contentId: string): Promise<Chapter[]> => {
+    const content = await this.getContent(contentId);
+    const scanlator = content.context?.scanlator as string | undefined;
+    const uploaded = content.context?.uploaded as string | undefined;
+    const date = uploaded ? new Date(uploaded) : new Date();
+    return [
+      {
+        id: contentId,
+        index: 0,
+        number: 1,
+        title: scanlator || "Chapter",
+        language: "en",
+        date: Number.isNaN(date.getTime()) ? new Date() : date,
+        webUrl: readerUrl(contentId),
+      },
+    ];
+  };
+
+  getChapterPages = async (
+    contentId: string,
+    _chapterId: string,
+  ): Promise<ChapterPage[]> => {
+    const detailsHtml = await this.getHtml(contentUrl(contentId));
+    const order = readerLanguageOrder(detailsHtml);
+
+    let lastError: unknown;
+    for (const language of order) {
+      try {
+        const html = await this.getHtml(
+          readerUrl(contentId, language),
+          contentUrl(contentId),
+        );
+        const pages = parseChapterPages(html);
+        if (pages.length) return pages;
+      } catch (error) {
+        if (cloudflareFromThrown(error)) throwCloudflare(CF_RESOLVE);
+        lastError = error;
+      }
+    }
+
+    throw (
+      lastError ??
+      new Error("Failed to find page list. Reader scripts were missing.")
+    );
+  };
+
+  private getTagId = async (
+    tag: string,
+    type: string,
+  ): Promise<number | undefined> => {
+    const taxonomy = TAXONOMY[type] ?? type;
+    const url = withQuery(`${BASE}/wp-admin/admin-ajax.php`, {
+      action: "search_manga_terms",
+      search: tag,
+      taxonomy,
+    });
+    const html = await this.getHtml(url, `${BASE}/`, {
+      "X-Requested-With": "XMLHttpRequest",
+      Accept: "application/json, text/javascript, */*;q=0.1",
+    });
+    let data: TermResult;
+    try {
+      data = JSON.parse(html) as TermResult;
+    } catch {
+      return undefined;
+    }
+    const hit = data.results?.find(
+      (item) => item.text.toLowerCase() === tag.toLowerCase(),
+    );
+    return hit?.id;
+  };
 }

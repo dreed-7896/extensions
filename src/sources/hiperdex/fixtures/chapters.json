@@ -1,0 +1,26 @@
+[
+  {
+    "id": 322960,
+    "seriesId": 8810,
+    "number": 120,
+    "title": "[END]",
+    "createdAt": "2026-02-28T05:10:08.000Z",
+    "language": "en"
+  },
+  {
+    "id": 322957,
+    "seriesId": 8810,
+    "number": 119,
+    "title": null,
+    "createdAt": "2026-02-28T05:10:06.000Z",
+    "language": "en"
+  },
+  {
+    "id": 322954,
+    "seriesId": 8810,
+    "number": 118,
+    "title": null,
+    "createdAt": "2026-02-28T05:10:04.000Z",
+    "language": "en"
+  }
+]

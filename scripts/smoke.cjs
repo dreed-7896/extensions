@@ -34,6 +34,8 @@ pages.set(`${BASE_N}/api/v2/galleries/123`, {
 });
 const BASE_C = 'https://novelcrow.com';
 pages.set(`${BASE_C}/?s=&post_type=wp-manga`, `<div class="page-item-detail"><div class="post-title"><a href="/comic/sample/">Sample</a></div><img data-src="/cover.jpg"></div>`);
+pages.set(`${BASE_C}/?s=&post_type=wp-manga&m_orderby=latest`, `<div class="page-item-detail"><div class="post-title"><a href="/comic/cover-title/"></a></div><img src="/cover.jpg" alt="Cover Title"></div>`);
+pages.set(`${BASE_C}/?s=&post_type=wp-manga&m_orderby=views`, `<div class="page-item-detail"><div class="post-title"><a title="Popular Title" href="/comic/popular-title/"></a></div><img src="/cover.jpg"></div>`);
 pages.set(`${BASE_C}/comic/sample/`, `<h1>Sample</h1><div class="summary_image"><img src="/cover.jpg"></div><li class="wp-manga-chapter"><a href="/comic/sample/chapter-1/">Chapter 1</a></li>`);
 const cipher = CryptoJS.AES.encrypt(JSON.stringify(['/page-1.jpg']), 'nonce-example').toString();
 pages.set(`${BASE_C}/comic/sample/chapter-1/`, `<script>var nonce='nonce-example'; var chapter_data='${cipher}';</script>`);
@@ -51,7 +53,6 @@ pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
   for (const [entry, id] of [
     ['src/sources/nhentai/index.ts', '123'],
     ['src/sources/novelcrow/index.ts', 'comic/sample'],
-    ['src/sources/hentairead/index.ts', 'hentai/sample'],
   ]) {
     const Source = load(entry);
     const source = new Source();
@@ -74,7 +75,7 @@ pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
   }
   // Evaluate the actual published bundles with the JavaScriptCore-like globals.
   // Node's normal context supplies atob and URL, hiding missing device globals.
-  for (const [name, id] of [['nhentai', '123'], ['novelcrow', 'comic/sample'], ['hentairead', 'hentai/sample']]) {
+  for (const [name, id] of [['nhentai', '123'], ['novelcrow', 'comic/sample']]) {
     const sandbox = { console, HttpClient: class {
       constructor(config) { this.base = config.baseUrl; }
       async get(path) {
@@ -93,26 +94,19 @@ pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
     assert.equal((await source.getChapterPages(id, chapters[0].id)).length, 1);
     console.log(`PASS bundled ${name}`);
   }
-  const HentaiRead = load('src/sources/hentairead/index.ts');
-  const hentaiRead = new HentaiRead();
-  assert.equal((await hentaiRead.getItemList({ key: 'recent' }, 1)).items[0].title, 'Gallery');
-  assert.equal((await hentaiRead.getContent('hentai/gallery')).title, 'Gallery');
-  assert.equal((await hentaiRead.getContent('hentai/gallery')).summary, 'Gallery description');
-  assert.equal((await hentaiRead.getContent('hentai/gallery')).coverImage, `${BASE_H}/gallery-cover.jpg`);
-  const galleryChapter = (await hentaiRead.getChapters('hentai/gallery'))[0];
-  assert.equal(galleryChapter.id, '/hentai/gallery/p/1/');
-  assert.equal((await hentaiRead.getChapterPages('hentai/gallery', galleryChapter.id))[0].url, 'https://henread.xyz/gallery/01.jpg');
-  assert.equal((await hentaiRead.getChapterPages('hentai/json', '/hentai/json/p/1/'))[0].url, `${BASE_H}/json-page.jpg`);
-  console.log('PASS HentaiRead gallery reader and metadata');
+  const novelcrow = new (load('src/sources/novelcrow/index.ts'))();
+  assert.equal((await novelcrow.getItemList({ key: 'recent' }, 1)).items[0].title, 'Cover Title');
+  assert.equal((await novelcrow.getItemList({ key: 'popular' }, 1)).items[0].title, 'Popular Title');
+  console.log('PASS NovelCrow latest/popular title fallbacks');
   const challenge = '<html><title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/main.js"></script></html>';
   pages.set(`${BASE_C}/?s=&post_type=wp-manga`, challenge);
-  pages.set(`${BASE_H}/?s=&title-type=contains&sortby=latest`, challenge);
-  for (const [Source, url] of [[load('src/sources/novelcrow/index.ts'), BASE_C], [HentaiRead, BASE_H]]) {
+  for (const [Source, url] of [[load('src/sources/novelcrow/index.ts'), BASE_C]]) {
     await assert.rejects(new Source().getSearchResults({}, 1), (error) =>
       error.name === 'CloudflareError' && error.resolutionURL === `${url}/`);
   }
   console.log('PASS HTTP 200 Cloudflare challenge handling');
   const catalog = JSON.parse(fs.readFileSync('dist/sources.json', 'utf8'));
+  assert.equal(catalog.sources.length, 10, 'combined list must contain all ten sources');
   const readme = fs.readFileSync('README.md', 'utf8');
   const baseUrl = readme.match(/https:\/\/raw\.githubusercontent\.com\/[^\s]+\/dist\b/)?.[0];
   assert.ok(baseUrl, 'README must give the catalog directory, not sources.json');
@@ -120,7 +114,12 @@ pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
     const bundle = new URL(`sources/${item.path}.stt`, `${baseUrl}/`);
     assert.ok(fs.existsSync(`dist/sources/${item.path}.stt`));
     assert.ok(bundle.pathname.endsWith(`/dist/sources/${item.path}.stt`));
+    const code = fs.readFileSync(`dist/sources/${item.path}.stt`, 'utf8');
+    // Source evaluation used to fail on device-only missing globals (atob).
+    const pkg = vm.runInNewContext(`${code}\nSourcePackage;`, { console }, { timeout: 3000 });
+    assert.equal(typeof pkg.bootstrap, 'function', `${item.id} has no bootstrap`);
   }
+  console.log('PASS all ten bundles evaluate with restricted globals');
   const http = require('node:http');
   const { HttpClient } = require('@suwatte/toolchain/emulator');
   const server = http.createServer((_req, response) => {

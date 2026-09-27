@@ -13764,6 +13764,7 @@ var SourcePackage = (() => {
           return (0, shared_1.checkedHtml)(await response.text(), `${BASE}/`);
         }
         items(html, page) {
+          var _a, _b, _c, _d, _e;
           const root = (0, shared_1.document)(html);
           const nodes = root.querySelectorAll(".page-item-detail, .c-tabs-item__content, .manga__item, .page-listing-item");
           const unique = /* @__PURE__ */ new Map();
@@ -13775,10 +13776,12 @@ var SourcePackage = (() => {
             const id = (0, shared_1.idFrom)(url, BASE);
             if (unique.has(id))
               continue;
+            const cover = node.querySelector(".tab-thumb img, .item-thumb img, img");
+            const title = (0, shared_1.text)(link) || ((_a = link == null ? void 0 : link.getAttribute("title")) == null ? void 0 : _a.trim()) || ((_b = link == null ? void 0 : link.getAttribute("aria-label")) == null ? void 0 : _b.trim()) || ((_d = (_c = link == null ? void 0 : link.querySelector("img")) == null ? void 0 : _c.getAttribute("alt")) == null ? void 0 : _d.trim()) || (0, shared_1.text)(node.querySelector(".post-title, h3")) || ((_e = cover == null ? void 0 : cover.getAttribute("alt")) == null ? void 0 : _e.trim()) || id.split("/").pop().replace(/[-_]+/g, " ");
             unique.set(id, {
               id,
-              title: (0, shared_1.text)(link),
-              coverImage: (0, shared_1.image)(node.querySelector(".tab-thumb img, .item-thumb img, img"), BASE),
+              title,
+              coverImage: (0, shared_1.image)(cover, BASE),
               webUrl: url,
               rating: types_1.ContentRating.MATURE
             });
@@ -13844,7 +13847,7 @@ var SourcePackage = (() => {
       __publicField(NovelCrow, "info", {
         id: "en.novelcrow",
         name: "NovelCrow",
-        version: 4,
+        version: 5,
         website: BASE,
         languages: ["en"],
         rating: types_1.ContentRating.MATURE,
@@ -13862,7 +13865,7 @@ var SourcePackage = (() => {
       var runtime = require_runtime();
       var sourceModule = require_novelcrow();
       var cls = runtime.resolveDefaultExport(sourceModule);
-      exports.SourceMetadata = { "id": "en.novelcrow", "name": "NovelCrow", "version": 4, "website": "https://novelcrow.com", "languages": ["en"], "rating": 2, "minSupportedAppVersion": "7.0.0" };
+      exports.SourceMetadata = { "id": "en.novelcrow", "name": "NovelCrow", "version": 5, "website": "https://novelcrow.com", "languages": ["en"], "rating": 2, "minSupportedAppVersion": "7.0.0" };
       exports.SourceConfiguration = null;
       exports.bootstrap = function bootstrap() {
         var args = null;

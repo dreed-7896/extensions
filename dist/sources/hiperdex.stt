@@ -4,6 +4,9 @@ var global = globalThis;
 var SourcePackage = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __typeError = (msg) => {
+    throw TypeError(msg);
+  };
   var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
   var __esm = (fn, res) => function __init() {
     return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
@@ -12,6 +15,10 @@ var SourcePackage = (() => {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
+  var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
+  var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
+  var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
 
   // node_modules/esbuild-plugins-node-modules-polyfill/globals/process.js
   var init_process = __esm({
@@ -1116,38 +1123,176 @@ var SourcePackage = (() => {
     }
   });
 
-  // __temp__/sources/hentairead/constants.js
+  // __temp__/sources/hiperdex/constants.js
   var require_constants = __commonJS({
-    "__temp__/sources/hentairead/constants.js"(exports) {
+    "__temp__/sources/hiperdex/constants.js"(exports) {
       "use strict";
       init_Buffer();
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
-      exports.TEXT_FILTERS = exports.TYPES = exports.SORTS = exports.IMAGE_ACCEPT = exports.CF_RESOLVE = exports.MANGA = exports.BASE = void 0;
-      exports.BASE = "https://hentairead.com";
-      exports.MANGA = "hentai";
-      exports.CF_RESOLVE = `${exports.BASE}/hentai/?sortby=new`;
+      exports.GENRES = exports.SETTINGS = exports.DEFAULT_MAX_RATING = exports.RATINGS = exports.STATUSES = exports.TYPES = exports.SORTS = exports.IMAGE_ACCEPT = exports.PAGE_LIMIT = exports.DEFAULT_AUTH = exports.AUTH_HEADER = exports.CF_RESOLVE = exports.MANGA = exports.BASE = void 0;
+      exports.BASE = "https://hiperdex.tv";
+      exports.MANGA = "manga";
+      exports.CF_RESOLVE = `${exports.BASE}/`;
+      exports.AUTH_HEADER = "x-cfg-auth";
+      exports.DEFAULT_AUTH = "yceqt7qgu004";
+      exports.PAGE_LIMIT = 30;
       exports.IMAGE_ACCEPT = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
       exports.SORTS = [
-        { id: "new", title: "Latest" },
-        { id: "alphabet", title: "A-Z" },
-        { id: "rating", title: "Rating" },
-        { id: "views", title: "Views" }
+        { id: "popular", title: "Popularity" },
+        { id: "recent", title: "Latest" },
+        { id: "relevance", title: "Relevance" },
+        { id: "score", title: "Score" },
+        { id: "newest", title: "Newest" },
+        { id: "oldest", title: "Oldest" },
+        { id: "alphabetical", title: "A-Z" }
       ];
       exports.TYPES = [
-        { id: "4", title: "Doujinshi" },
-        { id: "52", title: "Manga" },
-        { id: "4798", title: "Artist CG" },
-        { id: "36278", title: "Western" }
+        { id: "manga", title: "Manga" },
+        { id: "manhwa", title: "Manhwa" },
+        { id: "manhua", title: "Manhua" },
+        { id: "novel", title: "Novel" },
+        { id: "webtoon", title: "Webtoon" },
+        { id: "one_shot", title: "One Shot" }
       ];
-      exports.TEXT_FILTERS = [
-        { id: "tags", name: "Tags", type: "manga_tag", hint: "Comma-separated. Prefix with - to exclude." },
-        { id: "artists", name: "Artists", type: "artist", hint: "Comma-separated" },
-        { id: "circles", name: "Circles", type: "circle", hint: "Comma-separated" },
-        { id: "characters", name: "Characters", type: "character", hint: "Comma-separated" },
-        { id: "collections", name: "Collections", type: "collection", hint: "Comma-separated" },
-        { id: "scanlators", name: "Scanlators", type: "scanlator", hint: "Comma-separated" },
-        { id: "conventions", name: "Conventions", type: "convention", hint: "Comma-separated" }
+      exports.STATUSES = [
+        { id: "ongoing", title: "Ongoing" },
+        { id: "completed", title: "Completed" },
+        { id: "hiatus", title: "Hiatus" },
+        { id: "cancelled", title: "Canceled" }
+      ];
+      exports.RATINGS = [
+        { id: "pornographic", title: "Pornographic" },
+        { id: "erotica", title: "Erotica" },
+        { id: "suggestive", title: "Suggestive" },
+        { id: "safe", title: "Safe" }
+      ];
+      exports.DEFAULT_MAX_RATING = "pornographic";
+      exports.SETTINGS = {
+        maxRating: "hiperdex.maxRating",
+        cleanTitle: "hiperdex.cleanTitle",
+        cleanRegex: "hiperdex.cleanRegex",
+        noCleanBrowse: "hiperdex.noCleanBrowse"
+      };
+      exports.GENRES = [
+        "4-Koma",
+        "Action",
+        "Adaptation",
+        "Adult",
+        "Adventure",
+        "Age Gap",
+        "Aliens",
+        "Ancient Korea",
+        "Anthology",
+        "Campus",
+        "Childhood Friends",
+        "Comedy",
+        "Cooking",
+        "Crime",
+        "Crossdressing",
+        "Dance",
+        "Delinquents",
+        "Demons",
+        "Doujinshi",
+        "Drama",
+        "Ecchi",
+        "Escolar",
+        "Fantasy",
+        "Fellatio/Blowjob",
+        "Fetish",
+        "Full Color",
+        "Furry",
+        "Gender Bender",
+        "Genderswap",
+        "Ghosts",
+        "Girls' Love",
+        "Gore",
+        "Guideverse",
+        "Gyaru",
+        "Hair Color Change",
+        "Harem",
+        "Hentai",
+        "Heroes",
+        "Historical",
+        "Horror",
+        "Human-Nonhuman Relationship",
+        "Isekai",
+        "Josei",
+        "Korea",
+        "Korean Ambience",
+        "Korean BL",
+        "Long Strip",
+        "Long-Haired Male Character/s",
+        "Long-Haired Male Lead",
+        "Love Triangle/s",
+        "Low Fantasy",
+        "Maduro",
+        "Mafia",
+        "Magic",
+        "Male Protagonist",
+        "Manga",
+        "Martial Arts",
+        "Masculine Uke",
+        "Mature",
+        "Mecha",
+        "Medical",
+        "Military",
+        "Monster Girls",
+        "Monsters",
+        "Monsters Invade Earth",
+        "Murim",
+        "Muscular Male Lead",
+        "Muscular Uke",
+        "Music",
+        "Mystery",
+        "Nameverse",
+        "Ninja",
+        "Office Workers",
+        "Older Uke Younger Seme",
+        "Oneshot",
+        "Orphan Female Lead",
+        "Police",
+        "Post-Apocalyptic",
+        "Psychological",
+        "Red-Haired Male Lead",
+        "Red-Haired Seme",
+        "Regression",
+        "Reincarnation",
+        "Revenge",
+        "Romance",
+        "Samurai",
+        "School Life",
+        "Sci-fi",
+        "Secret Relationship",
+        "Seinen",
+        "Sexual Violence",
+        "Shota",
+        "Shoujo",
+        "Shoujo Ai",
+        "Shounen",
+        "Size Difference",
+        "Slice of Life",
+        "Smut",
+        "Sobrenatural",
+        "Sports",
+        "Superhero",
+        "Supernatural",
+        "Survival",
+        "Suspense",
+        "Thriller",
+        "Time Travel",
+        "Tower",
+        "Tragedy",
+        "Uncensored",
+        "Video Games",
+        "Villainess",
+        "Violence",
+        "Virtual Reality",
+        "Web Comic",
+        "Webtoon",
+        "Wuxia",
+        "Yaoi",
+        "Yuri"
       ];
     }
   });
@@ -1380,399 +1525,316 @@ var SourcePackage = (() => {
     }
   });
 
-  // __temp__/sources/hentairead/parse.js
+  // __temp__/sources/hiperdex/parse.js
   var require_parse = __commonJS({
-    "__temp__/sources/hentairead/parse.js"(exports) {
+    "__temp__/sources/hiperdex/parse.js"(exports) {
       "use strict";
       init_Buffer();
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
-      exports.readerLanguageOrder = exports.parseChapterPages = exports.parsePageRange = exports.parseDetails = exports.parseUploadedDate = exports.parseGalleryId = exports.parseLanguages = exports.taxonomyNames = exports.parseListing = exports.hasNextPage = exports.readerUrl = exports.contentUrl = exports.searchUrl = exports.listingUrl = exports.parseMangaId = void 0;
+      exports.isApiKeyError = exports.scriptSrcFromHome = exports.parseAuthFromBundle = exports.sessionCookieFromHeaders = exports.pagesFromDto = exports.chapterFromDto = exports.contentFromManga = exports.itemFromManga = exports.parseStatus = exports.cleanTitle = exports.parseAltTitles = exports.unwrapBatch = exports.pagesInput = exports.chaptersInput = exports.detailsInput = exports.searchInput = exports.trpcUrl = exports.chapterUrl = exports.contentUrl = exports.parseChapterId = exports.chapterIdOf = exports.formatChapterNumber = exports.parseSlug = void 0;
       var types_1 = require_types();
       var html_1 = require_html();
-      var http_1 = require_http2();
       var item_1 = require_item2();
       var constants_1 = require_constants();
-      var CARD_OPEN = /<div\b[^>]*class=["'](?:[^"']*\s)?manga-item(?:\s[^"']*)?["'][^>]*>/gi;
-      var TITLE_LINK = /<a\b([^>]*\bmanga-item__link\b[^>]*)>([\s\S]*?)<\/a>/i;
-      var COVER_IMG = /(<img\b[^>]*\bmanga-item__img-inner\b[^>]*>)/i;
-      var BASE64_JSON = /eyJ[A-Za-z0-9+/=]{16,}/g;
-      var parseMangaId = (href) => {
-        const cleaned = href.replace(/[?#].*$/, "").replace(/\/+$/, "");
-        const match = cleaned.match(/\/hentai\/([^/]+)/i);
-        if (match == null ? void 0 : match[1])
-          return decodeURIComponent(match[1]);
-        const last = cleaned.split("/").filter(Boolean).pop();
-        return last ? decodeURIComponent(last) : cleaned;
+      var TITLE_VERSION_RE = /^(?:\s*(?:\([^()]*\)|\{[^{}]*\}|\[(?:(?!]).)*]|«[^»]*»|〘[^〙]*〙|「[^」]*」|『[^』]*』|≪[^≫]*≫|﹛[^﹜]*﹜|〖[^〖〗]*〗|𖤍.+?𖤍|《[^》]*》|⌜.+?⌝|⟨[^⟩]*⟩)\s*)+|(?:\s*(?:\([^()]*\)|\{[^{}]*\}|\[(?:(?!]).)*]|«[^»]*»|〘[^〙]*〙|「[^」]*」|『[^』]*』|≪[^≫]*≫|﹛[^﹜]*﹜|〖[^〖〗]*〗|𖤍.+?𖤍|《[^》]*》|⌜.+?⌝|⟨[^⟩]*⟩|\/\s*Official)\s*)+$/i;
+      var parseSlug = (value) => {
+        var _a, _b;
+        const cleaned = value.replace(/[?#].*$/, "").replace(/\/+$/, "");
+        const marker = `/${constants_1.MANGA}/`;
+        const idx = cleaned.indexOf(marker);
+        if (idx !== -1) {
+          return decodeURIComponent((_a = cleaned.slice(idx + marker.length).split("/")[0]) != null ? _a : cleaned);
+        }
+        return decodeURIComponent((_b = cleaned.split("/").filter(Boolean).pop()) != null ? _b : cleaned);
       };
-      exports.parseMangaId = parseMangaId;
-      var listingUrl = (page, sortby) => {
-        const path = page <= 1 ? `${constants_1.BASE}/${constants_1.MANGA}/` : `${constants_1.BASE}/${constants_1.MANGA}/page/${page}/`;
-        return `${path}?sortby=${encodeURIComponent(sortby)}`;
+      exports.parseSlug = parseSlug;
+      var formatChapterNumber = (n) => String(n).replace(/\.0$/, "");
+      exports.formatChapterNumber = formatChapterNumber;
+      var chapterIdOf = (number, id) => `${(0, exports.formatChapterNumber)(number)}:${id}`;
+      exports.chapterIdOf = chapterIdOf;
+      var parseChapterId = (chapterId) => {
+        const cleaned = chapterId.replace(/\/+$/, "");
+        const colon = cleaned.lastIndexOf(":");
+        if (colon > 0) {
+          const number2 = Number.parseFloat(cleaned.slice(0, colon));
+          const id = cleaned.slice(colon + 1);
+          return {
+            number: Number.isFinite(number2) ? number2 : 1,
+            id: id || void 0
+          };
+        }
+        const number = Number.parseFloat(cleaned);
+        return { number: Number.isFinite(number) ? number : 1 };
       };
-      exports.listingUrl = listingUrl;
-      var searchUrl = (page, pairs) => {
-        const path = `${constants_1.BASE}/page/${Math.max(1, page)}/`;
-        if (!pairs.length)
-          return path;
-        const query = pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
-        return `${path}?${query}`;
-      };
-      exports.searchUrl = searchUrl;
-      var contentUrl = (contentId) => `${constants_1.BASE}/${constants_1.MANGA}/${encodeURI(contentId).replace(/%2F/gi, "/")}/`;
+      exports.parseChapterId = parseChapterId;
+      var contentUrl = (slug) => `${constants_1.BASE}/${constants_1.MANGA}/${encodeURI((0, exports.parseSlug)(slug))}/`;
       exports.contentUrl = contentUrl;
-      var readerUrl = (contentId, language = "english") => {
-        const base = (0, exports.contentUrl)(contentId);
-        if (!language)
-          return `${base}p/1/`;
-        return `${base}${language}/p/1/`;
+      var chapterUrl = (slug, number) => `${constants_1.BASE}/${constants_1.MANGA}/${encodeURI((0, exports.parseSlug)(slug))}/${(0, exports.formatChapterNumber)(number)}`;
+      exports.chapterUrl = chapterUrl;
+      var trpcUrl = (procedures, input) => {
+        const encoded = encodeURIComponent(JSON.stringify(input));
+        return `${constants_1.BASE}/api/trpc/${procedures}?batch=1&input=${encoded}`;
       };
-      exports.readerUrl = readerUrl;
-      var hasNextPage = (html) => /<a\b[^>]*rel=["']next["']/i.test(html) || /class=["'][^"']*\bnextpostslink\b/i.test(html) || /class=["'][^"']*\bnext\b[^"']*\bpage-numbers\b/i.test(html);
-      exports.hasNextPage = hasNextPage;
-      var isUsableImage = (src) => !!src && !src.startsWith("data:") && !/placeholder|blank\.|spacer|1x1|logo|spinner|icon|avatar/i.test(src);
-      var listingCover = (imgTag) => {
+      exports.trpcUrl = trpcUrl;
+      var searchInput = (payload) => {
         var _a;
-        const src = ((_a = (0, html_1.attr)(imgTag, "src")) != null ? _a : "").trim();
-        if (isUsableImage(src))
-          return src;
-        return (0, html_1.imageFromTag)(imgTag);
+        const genres = payload.genres;
+        const type = payload.type || null;
+        const status = payload.status || null;
+        const rating = payload.contentRating || null;
+        const year = ((_a = payload.year) == null ? void 0 : _a.trim()) || null;
+        return {
+          "0": {
+            json: {
+              q: payload.query,
+              sort: payload.sort,
+              filters: {
+                genres: genres.length ? genres : null,
+                type,
+                status,
+                contentRating: rating,
+                author: null,
+                artist: null,
+                year: year && /^\d{4}$/.test(year) ? Number(year) : null
+              },
+              limit: payload.limit,
+              offset: (Math.max(1, payload.page) - 1) * payload.limit,
+              maxRating: payload.maxRating
+            },
+            meta: {
+              values: {
+                ...genres.length ? {} : { "filters.genres": ["undefined"] },
+                ...type ? {} : { "filters.type": ["undefined"] },
+                ...status ? {} : { "filters.status": ["undefined"] },
+                ...rating ? {} : { "filters.contentRating": ["undefined"] },
+                "filters.author": ["undefined"],
+                "filters.artist": ["undefined"],
+                ...year ? {} : { "filters.year": ["undefined"] }
+              }
+            }
+          }
+        };
       };
-      var itemFromCard = (card) => {
+      exports.searchInput = searchInput;
+      var detailsInput = (slug) => ({
+        "0": { json: null, meta: { values: ["undefined"] } },
+        "1": { json: { slug } }
+      });
+      exports.detailsInput = detailsInput;
+      var chaptersInput = (seriesId) => ({
+        "0": { json: { values: ["undefined"] } },
+        "1": {
+          json: {
+            seriesId,
+            chapterId: null,
+            sort: "best",
+            page: 1,
+            limit: 1e3
+          },
+          meta: { values: { chapterId: ["undefined"] } }
+        },
+        "2": { json: { seriesId } }
+      });
+      exports.chaptersInput = chaptersInput;
+      var pagesInput = (slug, chapterNumber, chapterId) => ({
+        "0": { json: null, meta: { values: ["undefined"] } },
+        "1": { json: { slug } },
+        "2": {
+          json: {
+            seriesSlug: slug,
+            chapterNumber,
+            ...chapterId ? { chapterId: Number(chapterId) || chapterId } : {}
+          }
+        },
+        "3": { json: { position: "footer_bottom" } }
+      });
+      exports.pagesInput = pagesInput;
+      var unwrapBatch = (data, index = -1) => {
+        var _a;
+        if (!Array.isArray(data) || !data.length)
+          return void 0;
+        const element = index < 0 ? data[data.length + index] : data[index];
+        if (!element || typeof element !== "object")
+          return void 0;
+        const record = element;
+        if ("error" in record)
+          return void 0;
+        const result = record.result;
+        const wrapped = result == null ? void 0 : result.data;
+        return (_a = wrapped == null ? void 0 : wrapped.json) != null ? _a : void 0;
+      };
+      exports.unwrapBatch = unwrapBatch;
+      var parseAltTitles = (raw) => {
+        if (!raw)
+          return [];
+        if (Array.isArray(raw))
+          return raw.map(String).filter(Boolean);
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed))
+            return parsed.map(String).filter(Boolean);
+        } catch {
+        }
+        return raw.trim() ? [raw.trim()] : [];
+      };
+      exports.parseAltTitles = parseAltTitles;
+      var cleanTitle = (title, options) => {
+        let next = title;
+        if (options.customRegex) {
+          try {
+            next = next.replace(new RegExp(options.customRegex, "g"), "");
+          } catch {
+          }
+        }
+        if (options.stripVersion)
+          next = next.replace(TITLE_VERSION_RE, "");
+        return next.trim() || title.trim();
+      };
+      exports.cleanTitle = cleanTitle;
+      var parseStatus = (raw) => {
+        switch ((raw != null ? raw : "").toLowerCase()) {
+          case "ongoing":
+            return types_1.ContentStatus.ONGOING;
+          case "completed":
+            return types_1.ContentStatus.COMPLETED;
+          case "hiatus":
+            return types_1.ContentStatus.HIATUS;
+          case "cancelled":
+          case "canceled":
+            return types_1.ContentStatus.CANCELLED;
+          default:
+            return types_1.ContentStatus.UNKNOWN;
+        }
+      };
+      exports.parseStatus = parseStatus;
+      var readingModeOf = (type) => {
+        const value = (type != null ? type : "").toLowerCase();
+        if (value === "manhwa" || value === "webtoon" || value === "manhua") {
+          return types_1.ReadingMode.VERTICAL;
+        }
+        if (value === "manga")
+          return types_1.ReadingMode.PAGED_MANGA;
+        return void 0;
+      };
+      var itemFromManga = (dto, title) => {
         var _a, _b, _c;
-        const link = TITLE_LINK.exec(card);
-        if (!link)
-          return void 0;
-        const tag = `<a ${link[1]}>`;
-        const href = (_a = (0, html_1.attr)(tag, "href")) != null ? _a : "";
-        const title = (0, html_1.stripTags)((_b = link[2]) != null ? _b : "") || (0, html_1.attr)(tag, "title") || "";
-        if (!href || !title)
-          return void 0;
-        const id = (0, exports.parseMangaId)(href);
-        if (!id || /\/page\/\d+/i.test(href))
-          return void 0;
-        const imgTag = (_c = (0, html_1.firstMatch)(card, COVER_IMG)) != null ? _c : (0, html_1.firstMatch)(card, /(<img\b[^>]*>)/i);
-        const cover = imgTag ? listingCover(imgTag) : "";
+        const slug = (_a = dto.slug) != null ? _a : "";
         return (0, item_1.matureItem)({
-          id,
+          id: slug,
           title,
-          coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : void 0,
-          webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
+          coverImage: (_b = dto.coverUrl) != null ? _b : void 0,
+          webUrl: slug ? (0, exports.contentUrl)(slug) : void 0,
+          subtitle: (_c = dto.type) != null ? _c : void 0
         });
       };
-      var parseListing = (html) => {
-        var _a, _b, _c, _d;
-        const items = [];
-        const seen = /* @__PURE__ */ new Set();
-        const cards = (0, html_1.collectBlocks)(html, CARD_OPEN, "div");
-        const chunks = cards.length ? cards : html.split(/(?=<div\b[^>]*class=["'](?:[^"']*\s)?manga-item(?:\s))/i);
-        for (const chunk of chunks) {
-          const item = itemFromCard(chunk);
-          if (!item || seen.has(item.id))
-            continue;
-          seen.add(item.id);
-          items.push(item);
-        }
-        if (items.length)
-          return items;
-        const linkRe = /<a\b([^>]*\bmanga-item__link\b[^>]*)>([\s\S]*?)<\/a>/gi;
-        let match;
-        while (match = linkRe.exec(html)) {
-          const tag = `<a ${match[1]}>`;
-          const href = (_a = (0, html_1.attr)(tag, "href")) != null ? _a : "";
-          const title = (0, html_1.stripTags)((_b = match[2]) != null ? _b : "") || (0, html_1.attr)(tag, "title") || "";
-          if (!href || !title)
-            continue;
-          const id = (0, exports.parseMangaId)(href);
-          if (!id || seen.has(id) || /\/page\/\d+/i.test(href))
-            continue;
-          seen.add(id);
-          const before = html.slice(Math.max(0, match.index - 24e3), match.index);
-          const imgs = before.match(/<img\b[^>]*\bmanga-item__img-inner\b[^>]*>/gi);
-          const imgTag = imgs == null ? void 0 : imgs[imgs.length - 1];
-          const cover = imgTag ? listingCover(imgTag) : "";
-          items.push((0, item_1.matureItem)({
-            id,
-            title,
-            coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : void 0,
-            webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
-          }));
-        }
-        if (items.length)
-          return items;
-        const h3Re = /<h3\b[^>]*>\s*<a\b([^>]*href=["'][^"']*\/hentai\/[^"']+["'][^>]*)>([\s\S]*?)<\/a>/gi;
-        while (match = h3Re.exec(html)) {
-          const tag = `<a ${match[1]}>`;
-          const href = (_c = (0, html_1.attr)(tag, "href")) != null ? _c : "";
-          const title = (0, html_1.stripTags)((_d = match[2]) != null ? _d : "") || (0, html_1.attr)(tag, "title") || "";
-          if (!href || !title)
-            continue;
-          const id = (0, exports.parseMangaId)(href);
-          if (!id || seen.has(id) || /\/page\/\d+/i.test(href))
-            continue;
-          seen.add(id);
-          const before = html.slice(Math.max(0, match.index - 24e3), match.index);
-          const imgs = before.match(/<img\b[^>]*(?:manga-item__img-inner|src=)[^>]*>/gi);
-          const imgTag = imgs == null ? void 0 : imgs[imgs.length - 1];
-          const cover = imgTag ? listingCover(imgTag) : "";
-          items.push((0, item_1.matureItem)({
-            id,
-            title,
-            coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : void 0,
-            webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
-          }));
-        }
-        return items;
-      };
-      exports.parseListing = parseListing;
-      var capitalizeEach = (value) => value.split(" ").map((word) => word ? word.charAt(0).toUpperCase() + word.slice(1) : word).join(" ");
-      var isIndexHref = (href) => /-index\/?$/i.test(href.replace(/\/+$/, ""));
-      var taxonomyNames = (html, path) => {
-        var _a, _b, _c;
-        const pattern = new RegExp(`<a\\b([^>]*href=["'][^"']*${path}[^"']*["'][^>]*)>([\\s\\S]*?)<\\/a>`, "gi");
-        const names = [];
-        const seen = /* @__PURE__ */ new Set();
-        let match;
-        while (match = pattern.exec(html)) {
-          const href = (_a = (0, html_1.attr)(`<a ${match[1]}>`, "href")) != null ? _a : "";
-          if (isIndexHref(href) || !href.includes(path))
-            continue;
-          const span = (0, html_1.firstMatch)((_b = match[2]) != null ? _b : "", /<span\b[^>]*>([\s\S]*?)<\/span>/i);
-          const name = (0, html_1.stripTags)((_c = span != null ? span : match[2]) != null ? _c : "");
-          if (!name || seen.has(name.toLowerCase()))
-            continue;
-          seen.add(name.toLowerCase());
-          names.push(name);
-        }
-        return names;
-      };
-      exports.taxonomyNames = taxonomyNames;
-      var parseLanguages = (html) => {
-        var _a;
-        const slugs = [];
-        const re = /href=["'][^"']*\/language\/([^/"']+)\/?[^"']*["']/gi;
-        let match;
-        while (match = re.exec(html)) {
-          const slug = (_a = match[1]) == null ? void 0 : _a.toLowerCase();
-          if (slug && slug !== "language-index" && !slugs.includes(slug)) {
-            slugs.push(slug);
-          }
-        }
-        return slugs;
-      };
-      exports.parseLanguages = parseLanguages;
-      var parseGalleryId = (html) => {
-        const clip = (0, html_1.firstMatch)(html, /data-clipboard-text=["']#(\d+)["']/i);
-        if (clip)
-          return clip;
-        return (0, html_1.firstMatch)(html, /#\s*(\d{3,})/);
-      };
-      exports.parseGalleryId = parseGalleryId;
-      var parseUploadedDate = (html) => {
-        var _a;
-        const raw = (0, html_1.stripTags)((_a = (0, html_1.firstMatch)(html, /Uploaded:<\/div>\s*<div\b[^>]*>([\s\S]*?)<\/div>/i)) != null ? _a : "");
-        if (!raw)
-          return void 0;
-        const date = new Date(raw);
-        return Number.isNaN(date.getTime()) ? void 0 : date;
-      };
-      exports.parseUploadedDate = parseUploadedDate;
-      var labeledValue = (html, label) => {
-        var _a, _b;
-        return (0, html_1.stripTags)((_b = (_a = (0, html_1.firstMatch)(html, new RegExp(`${label}:<\\/div>[\\s\\S]{0,400}?<span[^>]*text-gray-100[^>]*>([\\s\\S]*?)<\\/span>`, "i"))) != null ? _a : (0, html_1.firstMatch)(html, new RegExp(`${label}:<\\/div>[\\s\\S]{0,400}?>(\\d[\\d.,KMB]*)`, "i"))) != null ? _b : "");
-      };
-      var parseDetails = (html, contentId) => {
-        var _a, _b, _c, _d;
-        const url = (0, exports.contentUrl)(contentId);
-        const title = (0, html_1.stripTags)((_b = (_a = (0, html_1.firstMatch)(html, /<div[^>]*class=["'][^"']*manga-titles[^"']*["'][^>]*>[\s\S]*?<h1\b[^>]*>([\s\S]*?)<\/h1>/i)) != null ? _a : (0, html_1.firstMatch)(html, /<h1\b[^>]*>([\s\S]*?)<\/h1>/i)) != null ? _b : "") || contentId;
-        const artists = (0, exports.taxonomyNames)(html, "/artist/");
-        const circles = (0, exports.taxonomyNames)(html, "/circle/");
-        const genres = (0, exports.taxonomyNames)(html, "/tag/");
-        const categories = (0, exports.taxonomyNames)(html, "/genre/");
-        const characters = [
-          ...(0, exports.taxonomyNames)(html, "/characters/"),
-          ...(0, exports.taxonomyNames)(html, "/character/")
-        ].filter((name, index, all) => all.indexOf(name) === index);
-        const parodies = (0, exports.taxonomyNames)(html, "/parody/");
-        const conventions = (0, exports.taxonomyNames)(html, "/convention/");
-        const scanlators = (0, exports.taxonomyNames)(html, "/scanlator/");
-        const languages = (0, exports.parseLanguages)(html);
-        const galleryId = (0, exports.parseGalleryId)(html);
-        const pagesCount = labeledValue(html, "Pages");
-        const views = labeledValue(html, "Views");
-        const year = (0, exports.taxonomyNames)(html, "/release/")[0];
-        const uploaded = (0, exports.parseUploadedDate)(html);
-        const altRaw = (0, html_1.stripTags)((_c = (0, html_1.firstMatch)(html, /<div[^>]*class=["'][^"']*manga-titles[^"']*["'][^>]*>[\s\S]*?<h2\b[^>]*>([\s\S]*?)<\/h2>/i)) != null ? _c : "") || "";
-        const additionalTitles = altRaw ? altRaw.split("|").map((t) => t.trim()).filter(Boolean) : [];
-        const parts = [];
-        if (characters.length) {
-          parts.push(`Characters: ${capitalizeEach(characters.join(", "))}`);
-        }
-        if (parodies.length) {
-          parts.push(`Parodies: ${capitalizeEach(parodies.join(", "))}`);
-        }
-        if (circles.length) {
-          parts.push(`Circles: ${capitalizeEach(circles.join(", "))}`);
-        }
-        if (conventions.length) {
-          parts.push(`Convention: ${capitalizeEach(conventions.join(", "))}`);
-        }
-        if (scanlators.length) {
-          parts.push(`Scanlators: ${capitalizeEach(scanlators.join(", "))}`);
-        }
-        if (languages.length) {
-          parts.push(`Language: ${languages.map(capitalizeEach).join(", ")}`);
-        }
-        if (additionalTitles.length) {
-          parts.push(`Alternative Titles:
-${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
-        }
-        if (pagesCount)
-          parts.push(`Pages: ${pagesCount}`);
-        let cover = (0, html_1.metaContent)(html, "og:image") || (0, html_1.metaContent)(html, "twitter:image") || "";
-        if (!cover) {
-          const img = (_d = (0, html_1.firstMatch)(html, /(<img\b[^>]*fetchpriority=["']high["'][^>]*>)/i)) != null ? _d : (0, html_1.firstMatch)(html, /(<img\b[^>]*class=["'][^"']*manga-item__img-inner[^>]*>)/i);
-          if (img)
-            cover = listingCover(img);
-        }
-        const author = circles.join(", ") || artists.join(", ") || void 0;
-        const artist = artists.join(", ") || circles.join(", ") || void 0;
-        const additionalDetails = {
-          ...galleryId ? { Gallery: galleryId } : {},
-          ...categories.length ? { Category: categories.join(", ") } : {},
-          ...year ? { Year: year } : {},
-          ...pagesCount ? { Pages: pagesCount } : {},
-          ...views ? { Views: views } : {}
-        };
+      exports.itemFromManga = itemFromManga;
+      var contentFromManga = (dto, title) => {
+        var _a, _b, _c, _d, _e, _f, _g;
+        const slug = (_a = dto.slug) != null ? _a : "";
+        const alts = (0, exports.parseAltTitles)(dto.alternativeTitles);
+        const authors = (_c = (_b = dto.authors) == null ? void 0 : _b.filter(Boolean)) != null ? _c : [];
+        const artists = (_e = (_d = dto.artists) == null ? void 0 : _d.filter(Boolean)) != null ? _e : [];
+        const genres = [
+          ...(_f = dto.genres) != null ? _f : [],
+          dto.type,
+          dto.contentRating
+        ].filter((g) => !!g);
         const credits = [
-          ...author ? [{ name: author, role: "Author" }] : [],
-          ...artist && artist !== author ? [{ name: artist, role: "Artist" }] : []
+          ...authors.map((name) => ({ name, role: "Author" })),
+          ...artists.filter((name) => !authors.includes(name)).map((name) => ({ name, role: "Artist" }))
         ];
+        const additionalDetails = {
+          ...dto.year ? { Year: String(dto.year) } : {},
+          ...dto.type ? { Type: dto.type } : {},
+          ...dto.contentRating ? { Rating: dto.contentRating } : {}
+        };
         return {
           title,
-          coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : "",
-          webUrl: url,
+          coverImage: (_g = dto.coverUrl) != null ? _g : "",
+          webUrl: slug ? (0, exports.contentUrl)(slug) : void 0,
           rating: types_1.ContentRating.MATURE,
-          status: types_1.ContentStatus.COMPLETED,
-          summary: parts.join("\n\n") || void 0,
-          additionalTitles: additionalTitles.length ? additionalTitles : void 0,
+          status: (0, exports.parseStatus)(dto.status),
+          readingMode: readingModeOf(dto.type),
+          summary: dto.synopsis || void 0,
+          additionalTitles: alts.length ? alts : void 0,
           additionalDetails: Object.keys(additionalDetails).length ? additionalDetails : void 0,
-          genres: genres.length ? genres.map((g) => ({
+          statistics: dto.score != null || dto.views != null ? {
+            ...dto.score != null ? { rating: dto.score } : {},
+            ...dto.views != null ? { views: dto.views } : {}
+          } : void 0,
+          genres: genres.map((g) => ({
             id: g.toLowerCase().replace(/\s+/g, "-"),
             title: g
-          })) : void 0,
-          ...characters.length ? { characters: characters.map((name) => ({ name })) } : {},
+          })),
           ...credits.length ? { credits } : {},
           context: {
-            ...scanlators.length ? { scanlator: scanlators.join(", ") } : {},
-            ...languages.length ? { languages } : {},
-            ...galleryId ? { galleryId } : {},
-            ...pagesCount ? { pageCount: pagesCount } : {},
-            ...uploaded ? { uploaded: uploaded.toISOString() } : {}
+            ...dto.id != null ? { mangaId: dto.id } : {},
+            slug
           }
         };
       };
-      exports.parseDetails = parseDetails;
-      var parsePageRange = (query, minPages = 1, maxPages = 9999) => {
-        const num = Number.parseInt(query.replace(/\D/g, ""), 10);
-        const limited = (n = num) => Math.min(maxPages, Math.max(minPages, n));
-        if (Number.isNaN(num) || num < 0)
-          return [minPages, maxPages];
-        switch (query[0]) {
-          case "<":
-            return query[1] === "=" ? [minPages, limited()] : [minPages, limited(Math.max(minPages, num - 1))];
-          case ">":
-            return [limited(query[1] === "=" ? num : num + 1), maxPages];
-          case "=":
-            if (query[1] === ">")
-              return [limited(), maxPages];
-            if (query[1] === "<")
-              return [minPages, limited()];
-            return [limited(), limited()];
-          default:
-            return [limited(), limited()];
-        }
+      exports.contentFromManga = contentFromManga;
+      var chapterFromDto = (dto, slug) => {
+        var _a;
+        if (dto.id == null || dto.number == null)
+          return void 0;
+        const number = Number(dto.number);
+        const label = `Chapter ${(0, exports.formatChapterNumber)(number)}`;
+        const rawTitle = ((_a = dto.title) != null ? _a : "").trim();
+        const title = rawTitle && /\d/.test(rawTitle) ? rawTitle : rawTitle ? `${label} ${rawTitle}` : label;
+        const date = dto.createdAt ? new Date(dto.createdAt) : void 0;
+        return {
+          id: (0, exports.chapterIdOf)(number, dto.id),
+          index: 0,
+          number,
+          title,
+          language: dto.language || "en",
+          date: date && !Number.isNaN(date.getTime()) ? date : void 0,
+          webUrl: (0, exports.chapterUrl)(slug, number),
+          data: { chapterId: String(dto.id), number, slug }
+        };
       };
-      exports.parsePageRange = parsePageRange;
-      var parsePageBaseUrl = (html) => {
+      exports.chapterFromDto = chapterFromDto;
+      var pagesFromDto = (pages) => [...pages].sort((a, b) => {
+        var _a, _b;
+        return ((_a = a.pageOrder) != null ? _a : 0) - ((_b = b.pageOrder) != null ? _b : 0);
+      }).map((page) => page.avifUrl || page.webpUrl || "").filter(Boolean).map((url) => ({ url }));
+      exports.pagesFromDto = pagesFromDto;
+      var sessionCookieFromHeaders = (headers) => {
         var _a, _b, _c;
-        const extra = (_a = (0, html_1.firstMatch)(html, /<script\b[^>]*id=["']single-chapter-js-extra["'][^>]*>([\s\S]*?)<\/script>/i)) != null ? _a : html;
-        return (_c = (_b = (0, html_1.firstMatch)(extra, /"baseUrl"\s*:\s*"([^"]+)"/)) != null ? _b : (0, html_1.firstMatch)(extra, /'baseUrl'\s*:\s*'([^']+)'/)) != null ? _c : "";
+        if (!headers)
+          return void 0;
+        const raw = typeof headers.get === "function" ? String((_b = (_a = headers.get("set-cookie")) != null ? _a : headers.get("Set-Cookie")) != null ? _b : "") : Object.entries(headers).filter(([key]) => key.toLowerCase() === "set-cookie").map(([, value]) => String(value != null ? value : "")).join(", ");
+        return (_c = raw.match(/__st=[^;,\s]+/)) == null ? void 0 : _c[0];
       };
-      var imagesFromDto = (dto, pageBaseUrl) => {
-        var _a, _b, _c;
-        const images = (_c = (_b = (_a = dto.data) == null ? void 0 : _a.chapter) == null ? void 0 : _b.images) != null ? _c : [];
-        return images.map((image) => {
-          var _a2;
-          return ((_a2 = image.src) != null ? _a2 : "").trim();
-        }).filter(Boolean).map((src) => {
-          if (/^https?:\/\//i.test(src) || src.startsWith("//")) {
-            return (0, http_1.absoluteUrl)(constants_1.BASE, src);
-          }
-          if (!pageBaseUrl)
-            return "";
-          return `${pageBaseUrl.replace(/\/+$/, "")}/${src.replace(/^\/+/, "")}`;
-        }).filter(Boolean);
-      };
-      var dtoFromBase64 = (blob) => {
-        var _a, _b, _c;
+      exports.sessionCookieFromHeaders = sessionCookieFromHeaders;
+      var parseAuthFromBundle = (js) => {
+        var _a;
+        const tagged = js.match(/\[120,45,99,102,103,45,97,117,116,104\][\s\S]{0,120}atob\("([A-Za-z0-9+/=]+)"\)\s*\+\s*"([^"]*)"/);
+        const plain = tagged != null ? tagged : js.match(/atob\("([A-Za-z0-9+/=]+)"\)\s*\+\s*"(\d+)"/);
+        if (!(plain == null ? void 0 : plain[1]))
+          return void 0;
         try {
-          const parsed = JSON.parse((0, html_1.base64Decode)(blob));
-          if ((_c = (_b = (_a = parsed == null ? void 0 : parsed.data) == null ? void 0 : _a.chapter) == null ? void 0 : _b.images) == null ? void 0 : _c.length)
-            return parsed;
+          return `${(0, html_1.base64Decode)(plain[1])}${(_a = plain[2]) != null ? _a : ""}`;
         } catch {
           return void 0;
         }
-        return void 0;
       };
-      var parseChapterPages = (html) => {
-        var _a, _b, _c, _d, _e;
-        const pageBaseUrl = parsePageBaseUrl(html);
-        const before = (_a = (0, html_1.firstMatch)(html, /<script\b[^>]*id=["']single-chapter-js-before["'][^>]*>([\s\S]*?)<\/script>/i)) != null ? _a : "";
-        const blobs = [
-          .../* @__PURE__ */ new Set([
-            ...(_b = before.match(BASE64_JSON)) != null ? _b : [],
-            ...(_c = html.match(BASE64_JSON)) != null ? _c : []
-          ])
-        ];
-        for (const blob of blobs) {
-          const dto = dtoFromBase64(blob);
-          if (!dto)
-            continue;
-          const urls2 = imagesFromDto(dto, pageBaseUrl);
-          if (urls2.length)
-            return urls2.map((url) => ({ url }));
-        }
-        const urls = [];
-        const imgRe = /<img\b[^>]*(?:wp-manga-chapter-img|reading-content)[^>]*>|<img\b[^>]*>/gi;
-        let img;
-        const reading = (_d = (0, html_1.firstMatch)(html, /<div\b[^>]*class=["'][^"']*reading-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)) != null ? _d : html;
-        while (img = imgRe.exec(reading)) {
-          const src = (0, html_1.imageFromTag)((_e = img[0]) != null ? _e : "");
-          if (isUsableImage(src) && !/hencover\.xyz/i.test(src)) {
-            urls.push((0, http_1.absoluteUrl)(constants_1.BASE, src));
-          }
-        }
-        return [...new Set(urls)].map((url) => ({ url }));
+      exports.parseAuthFromBundle = parseAuthFromBundle;
+      var scriptSrcFromHome = (html) => {
+        const match = html.match(/<script[^>]+src=["']([^"']*\/assets\/index-[^"']+\.js)["']/i);
+        return match == null ? void 0 : match[1];
       };
-      exports.parseChapterPages = parseChapterPages;
-      var readerLanguageOrder = (html) => {
-        const listed = (0, exports.parseLanguages)(html);
-        const order = [
-          ...listed.filter((lang) => lang === "english"),
-          "english",
-          ...listed.filter((lang) => lang !== "english"),
-          ""
-        ];
-        return order.filter((lang, index) => order.indexOf(lang) === index);
-      };
-      exports.readerLanguageOrder = readerLanguageOrder;
+      exports.scriptSrcFromHome = scriptSrcFromHome;
+      var isApiKeyError = (status, body) => status === 401 || /invalid or missing api key/i.test(body);
+      exports.isApiKeyError = isApiKeyError;
     }
   });
 
-  // __temp__/sources/hentairead/index.js
-  var require_hentairead = __commonJS({
-    "__temp__/sources/hentairead/index.js"(exports) {
+  // __temp__/sources/hiperdex/index.js
+  var require_hiperdex = __commonJS({
+    "__temp__/sources/hiperdex/index.js"(exports) {
       "use strict";
       "use httpclient";
       init_Buffer();
@@ -1785,16 +1847,11 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
       var http_1 = require_http2();
       var constants_1 = require_constants();
       var parse_1 = require_parse();
-      var TAXONOMY = {
-        artist: "manga_artist",
-        manga_tag: "manga_tag"
-      };
-      var isImageRequest = (url) => /hencover\.|henread\.|\/wp-content\/uploads\//i.test(url) || /\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(url);
       var isCloudflareError = (error) => {
         var _a, _b;
         const name = String((_a = error == null ? void 0 : error.name) != null ? _a : "");
         const message = String((_b = error == null ? void 0 : error.message) != null ? _b : error);
-        return name.includes("Cloudflare") || message.includes("Cloudflare") || message.includes("cloudflare");
+        return name.includes("Cloudflare") || message.toLowerCase().includes("cloudflare");
       };
       var cloudflareFromThrown = (error) => {
         var _a;
@@ -1805,11 +1862,28 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
           return false;
         return (0, cloudflare_1.cloudflareFromHeaders)((_a = response.status) != null ? _a : 0, response.headers);
       };
+      var isImageRequest = (url) => /r2d2storage\.|cloud-\d+\.r2d2/i.test(url) || /\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(url);
+      var _auth, _cookie, _warmed;
       var Target = class {
         constructor() {
+          __privateAdd(this, _auth, constants_1.DEFAULT_AUTH);
+          __privateAdd(this, _cookie, "");
+          __privateAdd(this, _warmed, false);
           __publicField(this, "client", (() => {
-            const http = (0, client_1.createProtectedClient)(constants_1.CF_RESOLVE, { Referer: `${constants_1.BASE}/` });
+            const http = new HttpClient({
+              timeout: 45e3,
+              retries: { count: 2, delay: 400 },
+              cloudflareResolutionURL: constants_1.CF_RESOLVE,
+              headers: (0, client_1.browserHeaders)({
+                Referer: `${constants_1.BASE}/`,
+                Origin: constants_1.BASE,
+                [constants_1.AUTH_HEADER]: constants_1.DEFAULT_AUTH
+              })
+            });
             http.interceptors.request.use((request) => {
+              request.headers.set(constants_1.AUTH_HEADER, __privateGet(this, _auth));
+              if (__privateGet(this, _cookie))
+                request.headers.set("Cookie", __privateGet(this, _cookie));
               if (isImageRequest(request.url)) {
                 request.headers.set("Accept", constants_1.IMAGE_ACCEPT);
                 request.headers.set("Referer", `${constants_1.BASE}/`);
@@ -1823,20 +1897,77 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
             cloudflareResolutionURL: constants_1.CF_RESOLVE,
             useClientForImageRequests: true
           }));
-          __publicField(this, "getSettingsPage", async () => ({
-            sections: [
-              {
-                header: "Cloudflare",
-                footer: "Same path as NovelCrow: open the source so Resolve runs, complete the check, then the Latest tab loads. Availability still aborts on CF by design. If Latest stays on grey tiles after Resolve: Settings \u2192 Advanced \u2192 Clear Network Cache, Open Challenge Page, pull to refresh. Safari cookies are not this source's jar.",
-                views: [
-                  (0, types_1.UIWebViewButton)({
-                    title: "Open Challenge Page",
-                    url: { url: constants_1.CF_RESOLVE }
-                  })
-                ]
-              }
-            ]
-          }));
+          __publicField(this, "getSettingsPage", async () => {
+            var _a, _b, _c, _d;
+            const maxRating = (_a = await ObjectStore.string(constants_1.SETTINGS.maxRating)) != null ? _a : constants_1.DEFAULT_MAX_RATING;
+            const cleanTitleOn = (_b = await ObjectStore.boolean(constants_1.SETTINGS.cleanTitle)) != null ? _b : false;
+            const cleanRegex = (_c = await ObjectStore.string(constants_1.SETTINGS.cleanRegex)) != null ? _c : "";
+            const noCleanBrowse = (_d = await ObjectStore.boolean(constants_1.SETTINGS.noCleanBrowse)) != null ? _d : false;
+            return {
+              sections: [
+                {
+                  header: "Cloudflare",
+                  footer: "If Browse fails with CF: complete Resolve, then retry. Availability aborts on CF by design. Settings \u2192 Advanced \u2192 Clear Network Cache if it loops.",
+                  views: [
+                    (0, types_1.UIWebViewButton)({
+                      title: "Open Challenge Page",
+                      url: { url: constants_1.CF_RESOLVE }
+                    })
+                  ]
+                },
+                {
+                  header: "Content",
+                  footer: "Restricts listings to this rating or below.",
+                  views: [
+                    (0, types_1.UIPicker)({
+                      id: constants_1.SETTINGS.maxRating,
+                      title: "Default max rating",
+                      options: [...constants_1.RATINGS],
+                      currentValue: maxRating,
+                      defaultValue: constants_1.DEFAULT_MAX_RATING
+                    })
+                  ]
+                },
+                {
+                  header: "Titles",
+                  views: [
+                    (0, types_1.UIToggle)({
+                      id: constants_1.SETTINGS.cleanTitle,
+                      title: "Strip version tags from titles",
+                      currentValue: cleanTitleOn,
+                      defaultValue: false
+                    }),
+                    (0, types_1.UITextField)({
+                      id: constants_1.SETTINGS.cleanRegex,
+                      title: "Custom title regex",
+                      currentValue: cleanRegex,
+                      placeholder: "optional"
+                    }),
+                    (0, types_1.UIToggle)({
+                      id: constants_1.SETTINGS.noCleanBrowse,
+                      title: "Don't clean titles while browsing",
+                      currentValue: noCleanBrowse,
+                      defaultValue: false
+                    })
+                  ]
+                }
+              ]
+            };
+          });
+          __publicField(this, "onFormSubmitted", async (_id, data) => {
+            if (typeof data[constants_1.SETTINGS.maxRating] === "string") {
+              await ObjectStore.set(constants_1.SETTINGS.maxRating, data[constants_1.SETTINGS.maxRating]);
+            }
+            if (typeof data[constants_1.SETTINGS.cleanTitle] === "boolean") {
+              await ObjectStore.set(constants_1.SETTINGS.cleanTitle, data[constants_1.SETTINGS.cleanTitle]);
+            }
+            if (typeof data[constants_1.SETTINGS.cleanRegex] === "string") {
+              await ObjectStore.set(constants_1.SETTINGS.cleanRegex, data[constants_1.SETTINGS.cleanRegex]);
+            }
+            if (typeof data[constants_1.SETTINGS.noCleanBrowse] === "boolean") {
+              await ObjectStore.set(constants_1.SETTINGS.noCleanBrowse, data[constants_1.SETTINGS.noCleanBrowse]);
+            }
+          });
           __publicField(this, "willRequestImage", async (request) => {
             var _a;
             return {
@@ -1848,11 +1979,132 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
               }
             };
           });
-          __publicField(this, "getHtml", async (url, referer = `${constants_1.BASE}/`, extraHeaders = {}) => {
+          __publicField(this, "getHomePage", async () => ({
+            feeds: [
+              {
+                id: "popular",
+                title: "Popular",
+                content: { list: { key: "popular", disableSorting: true } }
+              },
+              {
+                id: "latest",
+                title: "Latest",
+                content: { list: { key: "latest", disableSorting: true } }
+              }
+            ]
+          }));
+          __publicField(this, "getSortOptions", async () => ({
+            options: [...constants_1.SORTS],
+            disableOrdering: true
+          }));
+          __publicField(this, "getSearchFilters", async () => [
+            (0, types_1.SearchFilter)("type", "Type", (0, types_1.PickerFilter)([{ id: "", title: "All" }, ...constants_1.TYPES])),
+            (0, types_1.SearchFilter)("status", "Status", (0, types_1.PickerFilter)([{ id: "", title: "All" }, ...constants_1.STATUSES])),
+            (0, types_1.SearchFilter)("rating", "Rating", (0, types_1.PickerFilter)([{ id: "", title: "All" }, ...constants_1.RATINGS])),
+            (0, types_1.SearchFilter)("genres", "Genres", (0, types_1.SelectFilter)(constants_1.GENRES.map((g) => ({ id: g, title: g })), false))
+          ]);
+          __publicField(this, "getItemList", async (request, page) => {
+            const sort = request.key === "latest" ? "recent" : "popular";
+            return this.searchPage({ query: "", sort, page });
+          });
+          __publicField(this, "getSearchResults", async (request, page) => {
+            var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+            const filters = (_a = request.filters) != null ? _a : {};
+            const genres = (_c = (_b = filters.genres) == null ? void 0 : _b.include) != null ? _c : [];
+            return this.searchPage({
+              query: (_e = (_d = request.query) == null ? void 0 : _d.trim()) != null ? _e : "",
+              sort: ((_f = request.sort) == null ? void 0 : _f.key) || "relevance",
+              page,
+              type: String((_g = filters.type) != null ? _g : ""),
+              status: String((_h = filters.status) != null ? _h : ""),
+              contentRating: String((_i = filters.rating) != null ? _i : ""),
+              genres
+            });
+          });
+          __publicField(this, "getContent", async (contentId) => {
+            var _a, _b;
+            const slug = (0, parse_1.parseSlug)(contentId);
+            const data = await this.getJson((0, parse_1.trpcUrl)("auth.me,series.bySlugWithGenres", (0, parse_1.detailsInput)(slug)));
+            const dto = (0, parse_1.unwrapBatch)(data);
+            if (!(dto == null ? void 0 : dto.slug))
+              throw new Error(`Title not found: ${slug}`);
+            const prefs = await this.titlePrefs();
+            const title = (0, parse_1.cleanTitle)((_a = dto.title) != null ? _a : slug, prefs);
+            const content = (0, parse_1.contentFromManga)(dto, title);
+            if (title !== ((_b = dto.title) != null ? _b : "").trim() && dto.title) {
+              content.summary = [dto.title, content.summary].filter(Boolean).join("\n\n");
+            }
+            return content;
+          });
+          __publicField(this, "getChapters", async (contentId) => {
+            var _a;
+            const slug = (0, parse_1.parseSlug)(contentId);
+            const details = await this.getJson((0, parse_1.trpcUrl)("auth.me,series.bySlugWithGenres", (0, parse_1.detailsInput)(slug)));
+            const manga = (0, parse_1.unwrapBatch)(details);
+            const seriesId = manga == null ? void 0 : manga.id;
+            if (seriesId == null)
+              throw new Error(`Missing series id for ${slug}`);
+            const data = await this.getJson((0, parse_1.trpcUrl)("auth.me,series.chapters", (0, parse_1.chaptersInput)(seriesId)));
+            const list = (_a = (0, parse_1.unwrapBatch)(data)) != null ? _a : [];
+            return list.map((dto, index) => {
+              const chapter = (0, parse_1.chapterFromDto)(dto, slug);
+              if (!chapter)
+                return void 0;
+              chapter.index = index;
+              return chapter;
+            }).filter((chapter) => !!chapter);
+          });
+          __publicField(this, "getChapterPages", async (contentId, chapterId) => {
+            var _a;
+            const slug = (0, parse_1.parseSlug)(contentId);
+            const ref = (0, parse_1.parseChapterId)(chapterId);
+            const data = await this.getJson((0, parse_1.trpcUrl)("auth.me,series.bySlug,reader.chapterPages", (0, parse_1.pagesInput)(slug, ref.number, ref.id)));
+            if (Array.isArray(data) && data.some((el) => el && typeof el === "object" && "error" in el)) {
+              throw new Error("Reader API rejected this chapter (try Resolve CF, then retry).");
+            }
+            const pages = (_a = (0, parse_1.unwrapBatch)(data)) != null ? _a : [];
+            const mapped = (0, parse_1.pagesFromDto)(pages);
+            if (!mapped.length)
+              throw new Error("No pages found for this chapter");
+            return mapped;
+          });
+          __publicField(this, "searchPage", async (options) => {
+            var _a, _b, _c, _d, _e, _f;
+            const prefs = await this.titlePrefs();
+            const maxRating = (_a = await ObjectStore.string(constants_1.SETTINGS.maxRating)) != null ? _a : constants_1.DEFAULT_MAX_RATING;
+            const data = await this.getJson((0, parse_1.trpcUrl)("search.query", (0, parse_1.searchInput)({
+              query: options.query,
+              sort: options.sort,
+              genres: (_b = options.genres) != null ? _b : [],
+              type: options.type,
+              status: options.status,
+              contentRating: options.contentRating,
+              maxRating,
+              page: options.page,
+              limit: constants_1.PAGE_LIMIT
+            })));
+            const hits = (_f = (_e = (_c = (0, parse_1.unwrapBatch)(data, 0)) == null ? void 0 : _c.hits) != null ? _e : (_d = (0, parse_1.unwrapBatch)(data)) == null ? void 0 : _d.hits) != null ? _f : [];
+            const browseClean = prefs.stripVersion || !!prefs.customRegex;
+            const items = hits.filter((hit) => hit.slug && hit.title).map((hit) => {
+              const title = prefs.noCleanBrowse || !browseClean ? hit.title : (0, parse_1.cleanTitle)(hit.title, prefs);
+              const item = (0, parse_1.itemFromManga)(hit, title);
+              item.context = hit.id != null ? { mangaId: hit.id } : void 0;
+              return item;
+            });
+            return { items, isLastPage: hits.length < constants_1.PAGE_LIMIT };
+          });
+          __publicField(this, "titlePrefs", async () => {
             var _a, _b, _c;
+            return {
+              stripVersion: (_a = await ObjectStore.boolean(constants_1.SETTINGS.cleanTitle)) != null ? _a : false,
+              customRegex: (_b = await ObjectStore.string(constants_1.SETTINGS.cleanRegex)) != null ? _b : "",
+              noCleanBrowse: (_c = await ObjectStore.boolean(constants_1.SETTINGS.noCleanBrowse)) != null ? _c : false
+            };
+          });
+          __publicField(this, "warmSession", async () => {
             try {
-              const response = await this.client.get(url, {
-                headers: { Referer: referer, ...extraHeaders }
+              const response = await this.client.get(`${constants_1.BASE}/`, {
+                headers: { Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
               });
               if ((0, cloudflare_1.cloudflareFromHeaders)(response.status, response.headers)) {
                 (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
@@ -1860,180 +2112,102 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
               const body = await response.text();
               if ((0, cloudflare_1.looksLikeCloudflare)(body))
                 (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-              if (!response.ok) {
-                throw new Error(`GET ${url} failed (${response.status})`);
-              }
-              return body;
+              const cookie = (0, parse_1.sessionCookieFromHeaders)(response.headers);
+              if (cookie)
+                __privateSet(this, _cookie, cookie);
+              __privateSet(this, _warmed, true);
             } catch (error) {
               if (cloudflareFromThrown(error))
                 (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-              const response = error.response;
-              if (response) {
-                const body = (_b = await ((_a = response.text) == null ? void 0 : _a.call(response).catch(() => ""))) != null ? _b : "";
-                if ((0, cloudflare_1.looksLikeCloudflare)(body) || (0, cloudflare_1.cloudflareFromHeaders)((_c = response.status) != null ? _c : 0, response.headers)) {
-                  (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-                }
-              }
               throw error;
             }
           });
-          __publicField(this, "failEmptyListing", (html) => {
-            var _a, _b, _c;
-            if ((0, cloudflare_1.looksLikeCloudflare)(html))
-              (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-            const title = (_c = (_b = (_a = html.match(/<title>([\s\S]*?)<\/title>/i)) == null ? void 0 : _a[1]) == null ? void 0 : _b.replace(/\s+/g, " ").trim()) != null ? _c : "";
-            throw new Error(`HentaiRead listing parsed 0 titles (${html.length} bytes${title ? `, ${title.slice(0, 80)}` : ""}). Clear Network Cache, Open Challenge Page, retry.`);
-          });
-          __publicField(this, "getHomePage", async () => {
-            await (0, cloudflare_1.assertCloudflareCleared)(this.client, constants_1.CF_RESOLVE);
-            return {
-              feeds: [
-                {
-                  id: "latest",
-                  title: "Latest",
-                  content: { list: { key: "latest", disableSorting: true } }
-                },
-                {
-                  id: "popular",
-                  title: "Popular",
-                  content: { list: { key: "popular", disableSorting: true } }
-                }
-              ]
-            };
-          });
-          __publicField(this, "getSortOptions", async () => ({
-            options: [...constants_1.SORTS],
-            disableOrdering: false
-          }));
-          __publicField(this, "getSearchFilters", async () => [
-            (0, types_1.SearchFilter)("types", "Types", (0, types_1.SelectFilter)(constants_1.TYPES.map((type) => ({ id: type.id, title: type.title })), false)),
-            ...constants_1.TEXT_FILTERS.map((filter) => (0, types_1.SearchFilter)(filter.id, filter.name, (0, types_1.TextFilter)(), filter.hint)),
-            (0, types_1.SearchFilter)("uploaded", "Uploaded", (0, types_1.TextFilter)(), "Year filter, e.g. >2024"),
-            (0, types_1.SearchFilter)("pages", "Pages", (0, types_1.TextFilter)(), "Page count filter, e.g. >20")
-          ]);
-          __publicField(this, "getItemList", async (request, page) => {
-            const sortby = request.key === "popular" ? "views" : "new";
-            const html = await this.getHtml((0, parse_1.listingUrl)(page, sortby));
-            const items = (0, parse_1.parseListing)(html);
-            if (!items.length)
-              this.failEmptyListing(html);
-            return { items, isLastPage: !(0, parse_1.hasNextPage)(html) };
-          });
-          __publicField(this, "getSearchResults", async (request, page) => {
-            var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
-            const filters = (_a = request.filters) != null ? _a : {};
-            const pairs = [
-              ["s", (_c = (_b = request.query) == null ? void 0 : _b.trim()) != null ? _c : ""],
-              ["title-type", "contains"],
-              ["sortby", (_e = (_d = request.sort) == null ? void 0 : _d.key) != null ? _e : "new"],
-              ["order", ((_f = request.sort) == null ? void 0 : _f.ascending) ? "asc" : "desc"]
-            ];
-            const types = filters.types;
-            for (const value of (_g = types == null ? void 0 : types.include) != null ? _g : []) {
-              pairs.push(["categories[]", value]);
+          __publicField(this, "refreshAuth", async () => {
+            try {
+              const home = await this.client.get(`${constants_1.BASE}/`, {
+                headers: { Accept: "text/html,application/xhtml+xml" }
+              });
+              const html = await home.text();
+              const src = (0, parse_1.scriptSrcFromHome)(html);
+              if (!src)
+                return;
+              const js = await this.client.get((0, http_1.absoluteUrl)(constants_1.BASE, src), {
+                headers: { Accept: "*/*", Referer: `${constants_1.BASE}/` }
+              });
+              const next = (0, parse_1.parseAuthFromBundle)(await js.text());
+              if (next)
+                __privateSet(this, _auth, next);
+            } catch (error) {
+              if (cloudflareFromThrown(error))
+                (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
             }
-            for (const filter of constants_1.TEXT_FILTERS) {
-              const raw = (_h = filters[filter.id]) == null ? void 0 : _h.trim();
-              if (!raw)
-                continue;
-              for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
-                const exclude = part.startsWith("-");
-                const name = exclude ? part.slice(1).trim() : part;
-                const id = await this.getTagId(name, filter.type);
-                if (id == null) {
-                  throw new Error(`${filter.name.replace(/s$/, "")} not found: ${name}`);
-                }
-                if (filter.type === "manga_tag") {
-                  pairs.push([exclude ? "excluding[]" : "including[]", String(id)]);
-                } else {
-                  pairs.push([`${filter.type}s[]`, String(id)]);
-                }
-              }
-            }
-            const uploaded = (_i = filters.uploaded) == null ? void 0 : _i.trim();
-            if (uploaded) {
-              const kind = uploaded[0] === ">" ? "after" : uploaded[0] === "<" ? "before" : "in";
-              pairs.push(["release-type", kind]);
-              pairs.push(["release", uploaded.replace(/\D/g, "")]);
-            }
-            const pages = (_j = filters.pages) == null ? void 0 : _j.trim();
-            if (pages) {
-              const [min, max] = (0, parse_1.parsePageRange)(pages);
-              pairs.push(["pages", `${min}-${max}`]);
-            }
-            const html = await this.getHtml((0, parse_1.searchUrl)(page, pairs));
-            const items = (0, parse_1.parseListing)(html);
-            return { items, isLastPage: !(0, parse_1.hasNextPage)(html) || items.length === 0 };
           });
-          __publicField(this, "getContent", async (contentId) => {
-            const html = await this.getHtml((0, parse_1.contentUrl)(contentId));
-            return (0, parse_1.parseDetails)(html, contentId);
-          });
-          __publicField(this, "getChapters", async (contentId) => {
-            var _a, _b;
-            const content = await this.getContent(contentId);
-            const scanlator = (_a = content.context) == null ? void 0 : _a.scanlator;
-            const uploaded = (_b = content.context) == null ? void 0 : _b.uploaded;
-            const date = uploaded ? new Date(uploaded) : /* @__PURE__ */ new Date();
-            return [
-              {
-                id: contentId,
-                index: 0,
-                number: 1,
-                title: scanlator || "Chapter",
-                language: "en",
-                date: Number.isNaN(date.getTime()) ? /* @__PURE__ */ new Date() : date,
-                webUrl: (0, parse_1.readerUrl)(contentId)
-              }
-            ];
-          });
-          __publicField(this, "getChapterPages", async (contentId, _chapterId) => {
-            const detailsHtml = await this.getHtml((0, parse_1.contentUrl)(contentId));
-            const order = (0, parse_1.readerLanguageOrder)(detailsHtml);
-            let lastError;
-            for (const language of order) {
+          __publicField(this, "getJson", async (url) => {
+            const once = async () => {
               try {
-                const html = await this.getHtml((0, parse_1.readerUrl)(contentId, language), (0, parse_1.contentUrl)(contentId));
-                const pages = (0, parse_1.parseChapterPages)(html);
-                if (pages.length)
-                  return pages;
+                const response = await this.client.get(url, {
+                  headers: {
+                    Accept: "application/json",
+                    Origin: constants_1.BASE,
+                    Referer: `${constants_1.BASE}/`
+                  }
+                });
+                if ((0, cloudflare_1.cloudflareFromHeaders)(response.status, response.headers)) {
+                  (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
+                }
+                const body = await response.text();
+                if ((0, cloudflare_1.looksLikeCloudflare)(body))
+                  (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
+                return { status: response.status, body };
               } catch (error) {
                 if (cloudflareFromThrown(error))
                   (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-                lastError = error;
+                const response = error.response;
+                if (response == null ? void 0 : response.status) {
+                  const body = await response.text().catch(() => "");
+                  if ((0, cloudflare_1.looksLikeCloudflare)(body))
+                    (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
+                  return { status: response.status, body };
+                }
+                throw error;
               }
-            }
-            throw lastError != null ? lastError : new Error("Failed to find page list. Reader scripts were missing.");
-          });
-          __publicField(this, "getTagId", async (tag, type) => {
-            var _a, _b;
-            const taxonomy = (_a = TAXONOMY[type]) != null ? _a : type;
-            const url = (0, http_1.withQuery)(`${constants_1.BASE}/wp-admin/admin-ajax.php`, {
-              action: "search_manga_terms",
-              search: tag,
-              taxonomy
-            });
-            const html = await this.getHtml(url, `${constants_1.BASE}/`, {
-              "X-Requested-With": "XMLHttpRequest",
-              Accept: "application/json, text/javascript, */*;q=0.1"
-            });
-            let data;
+            };
             try {
-              data = JSON.parse(html);
-            } catch {
-              return void 0;
+              if (!__privateGet(this, _warmed))
+                await this.warmSession();
+              let { status, body } = await once();
+              if ((0, parse_1.isApiKeyError)(status, body)) {
+                await this.warmSession();
+                ({ status, body } = await once());
+              }
+              if ((0, parse_1.isApiKeyError)(status, body)) {
+                await this.refreshAuth();
+                ({ status, body } = await once());
+              }
+              if ((0, parse_1.isApiKeyError)(status, body)) {
+                throw new Error("Hiperdex API key/session rejected. Open the source, Resolve CF, then retry.");
+              }
+              if (status < 200 || status >= 300) {
+                throw new Error(`GET ${url} failed (${status}): ${body.slice(0, 180)}`);
+              }
+              return JSON.parse(body);
+            } catch (error) {
+              if (cloudflareFromThrown(error))
+                (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
+              throw error;
             }
-            const hit = (_b = data.results) == null ? void 0 : _b.find((item) => item.text.toLowerCase() === tag.toLowerCase());
-            return hit == null ? void 0 : hit.id;
           });
         }
       };
+      _auth = new WeakMap();
+      _cookie = new WeakMap();
+      _warmed = new WeakMap();
       __publicField(Target, "info", {
-        id: "en.hentairead",
-        name: "HentaiRead",
-        version: 5,
+        id: "en.hiperdex",
+        name: "Hiperdex",
+        version: 1,
         website: constants_1.BASE,
-        thumbnail: "hentairead.png",
+        thumbnail: "hiperdex.png",
         languages: ["en"],
         rating: types_2.ContentRating.MATURE
       });
@@ -2041,15 +2215,15 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
     }
   });
 
-  // __temp__/wrappers/hentairead.js
-  var require_hentairead2 = __commonJS({
-    "__temp__/wrappers/hentairead.js"(exports) {
+  // __temp__/wrappers/hiperdex.js
+  var require_hiperdex2 = __commonJS({
+    "__temp__/wrappers/hiperdex.js"(exports) {
       init_Buffer();
       init_process();
       var runtime = require_runtime();
-      var sourceModule = require_hentairead();
+      var sourceModule = require_hiperdex();
       var cls = runtime.resolveDefaultExport(sourceModule);
-      exports.SourceMetadata = { "id": "en.hentairead", "name": "HentaiRead", "version": 5, "website": "https://hentairead.com", "thumbnail": "hentairead.png", "languages": ["en"], "rating": 2 };
+      exports.SourceMetadata = { "id": "en.hiperdex", "name": "Hiperdex", "version": 1, "website": "https://hiperdex.tv", "thumbnail": "hiperdex.png", "languages": ["en"], "rating": 2 };
       exports.SourceConfiguration = null;
       exports.bootstrap = function bootstrap() {
         var args = null;
@@ -2057,5 +2231,5 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
       };
     }
   });
-  return require_hentairead2();
+  return require_hiperdex2();
 })();

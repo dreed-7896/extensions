@@ -33,7 +33,7 @@ export function protectedImages(html: string): string[] {
 
 export default class NovelCrow {
   static info: SourceInfo = {
-    id: "en.novelcrow", name: "NovelCrow", version: 4,
+    id: "en.novelcrow", name: "NovelCrow", version: 5,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
@@ -57,7 +57,16 @@ export default class NovelCrow {
       if (!url || !pathFrom(url).startsWith("/comic/")) continue;
       const id = idFrom(url, BASE);
       if (unique.has(id)) continue;
-      unique.set(id, { id, title: text(link), coverImage: image(node.querySelector(".tab-thumb img, .item-thumb img, img"), BASE),
+      const cover = node.querySelector(".tab-thumb img, .item-thumb img, img");
+      // Some cards show the title only in an attribute or on the cover image.
+      // Always provide a readable title even when the anchor has no text.
+      const title = text(link) || link?.getAttribute("title")?.trim()
+        || link?.getAttribute("aria-label")?.trim()
+        || link?.querySelector("img")?.getAttribute("alt")?.trim()
+        || text(node.querySelector(".post-title, h3"))
+        || cover?.getAttribute("alt")?.trim()
+        || id.split("/").pop()!.replace(/[-_]+/g, " ");
+      unique.set(id, { id, title, coverImage: image(cover, BASE),
         webUrl: url, rating: ContentRating.MATURE });
     }
     return pageResult(Array.from(unique.values()), root, page);
