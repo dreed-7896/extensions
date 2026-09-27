@@ -1,0 +1,360 @@
+:root {
+  --bg: #f8fafc;
+  --bg-accent: #f1f5f9;
+  --panel: #ffffff;
+  --panel-strong: #ffffff;
+  --line: #e2e8f0;
+  --text: #0f172a;
+  --muted: #475569;
+  --primary: #334155;
+  --primary-strong: #1e293b;
+  --chip: #e2e8f0;
+  --success: #334155;
+  --radius-xl: 12px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+}
+
+.catalog-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2.25rem 1.2rem 2.6rem;
+}
+
+.catalog-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 1.4rem;
+}
+
+.catalog-hero__content h1 {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.2vw, 2.05rem);
+  line-height: 1.15;
+}
+
+.catalog-eyebrow {
+  margin: 0 0 0.45rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+#catalog-subtitle {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.button {
+  border: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(100, 116, 139, 0.3);
+  outline-offset: 2px;
+}
+
+.button--primary {
+  background: var(--primary);
+  color: #ffffff;
+  padding: 0.75rem 1.05rem;
+}
+
+.button--primary:hover {
+  background: var(--primary-strong);
+  transform: translateY(-1px);
+}
+
+.button--table {
+  background: var(--chip);
+  color: var(--primary);
+  padding: 0.42rem 0.75rem;
+  font-size: 0.83rem;
+}
+
+.button--table:hover {
+  background: #cbd5e1;
+}
+
+.catalog-controls {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.control input,
+.control select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  font-size: 0.92rem;
+  padding: 0.62rem 0.72rem;
+}
+
+.catalog-table-shell {
+  margin-top: 0.95rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.catalog-table {
+  width: 100%;
+  min-width: 780px;
+  border-collapse: collapse;
+}
+
+.catalog-table thead th {
+  text-align: left;
+  padding: 0.72rem 0.85rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.catalog-table tbody td {
+  border-bottom: 1px solid #e8eff8;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.93rem;
+  vertical-align: middle;
+}
+
+.catalog-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.source-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.68rem;
+  min-width: 280px;
+}
+
+.source-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+}
+
+.source-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.source-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.source-name {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.source-version {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.source-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.71rem;
+  color: var(--muted);
+}
+
+.source-language-subtitle {
+  display: none;
+}
+
+.lang-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+
+.lang-pill {
+  font-size: 0.72rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.46rem;
+  background: #f1f5f9;
+  color: var(--success);
+  font-weight: 600;
+}
+
+.catalog-table a {
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.87rem;
+}
+
+.catalog-table a:hover {
+  text-decoration: underline;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 1rem;
+  color: var(--muted);
+  text-align: center;
+  font-weight: 500;
+}
+
+@media (max-width: 840px) {
+  .catalog-page {
+    padding-top: 1.2rem;
+  }
+
+  .catalog-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .button--primary {
+    width: 100%;
+  }
+
+  .catalog-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-table {
+    min-width: 0;
+  }
+
+  .catalog-table thead {
+    display: none;
+  }
+
+  .catalog-table tbody {
+    display: block;
+  }
+
+  .catalog-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.68rem 0.78rem;
+    border-bottom: 1px solid #e8eff8;
+  }
+
+  .catalog-table tbody td {
+    border: 0;
+    padding: 0;
+  }
+
+  .catalog-table tbody td.cell-languages,
+  .catalog-table tbody td.cell-website {
+    display: none;
+  }
+
+  .catalog-table tbody td.cell-source {
+    min-width: 0;
+  }
+
+  .catalog-table tbody td.cell-action {
+    justify-self: end;
+  }
+
+  .source-cell {
+    min-width: 0;
+    gap: 0.6rem;
+  }
+
+  .source-thumb {
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+  }
+
+  .source-name {
+    font-size: 0.93rem;
+  }
+
+  .source-version,
+  .source-id {
+    display: none;
+  }
+
+  .source-language-subtitle {
+    display: block;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-style: italic;
+  }
+
+  .button--table {
+    padding: 0.38rem 0.68rem;
+    font-size: 0.81rem;
+  }
+}

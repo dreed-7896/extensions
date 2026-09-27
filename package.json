@@ -1,0 +1,31 @@
+{
+  "name": "suwatte-extensions",
+  "version": "1.0.0",
+  "description": "Suwatte v7 source list for NHentai, NovelCrow and HentaiRead",
+  "scripts": {
+    "build": "suwatte build",
+    "check": "tsc --noEmit && node scripts/smoke.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dreed-7896/extensions.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "suwatte": {"listName": "Raahat's Suwatte Sources"},
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/dreed-7896/extensions/issues"
+  },
+  "homepage": "https://github.com/dreed-7896/extensions#readme",
+  "devDependencies": {
+    "@suwatte/toolchain": "^1.0.0",
+    "@types/crypto-js": "^4.2.2",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "node-html-parser": "^9.0.4"
+  }
+}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Suwatte Source List</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Install Suwatte sources directly from this catalog."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link href="main.css" rel="stylesheet" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="https://suwatte.mantton.com/favicon.svg"
+    />
+  </head>
+  <body>
+    <main class="catalog-page">
+      <header class="catalog-hero">
+        <div class="catalog-hero__content">
+          <p class="catalog-eyebrow">Source Catalog</p>
+          <h1 id="catalog-title">Suwatte Source List</h1>
+          <p id="catalog-subtitle">Loading sources...</p>
+        </div>
+        <button id="add-all-button" type="button" class="button button--primary">
+          Add To Suwatte
+        </button>
+      </header>
+
+      <section class="catalog-controls" aria-label="Catalog controls">
+        <label class="control">
+          <span>Search</span>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Search by name, website, or id"
+            autocomplete="off"
+          />
+        </label>
+
+        <label class="control">
+          <span>Sort</span>
+          <select id="sort-select">
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+            <option value="version_desc">Version (Newest)</option>
+            <option value="version_asc">Version (Oldest)</option>
+          </select>
+        </label>
+
+        <label class="control">
+          <span>Language</span>
+          <select id="language-select">
+            <option value="all">All languages</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="catalog-table-shell" aria-live="polite">
+        <table class="catalog-table">
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col">Languages</th>
+              <th scope="col">Website</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody id="source-table-body"></tbody>
+        </table>
+
+        <p id="empty-state" class="empty-state" hidden>
+          No sources match your filters.
+        </p>
+      </section>
+    </main>
+
+    <script src="catalog.js"></script>
+  </body>
+</html>
