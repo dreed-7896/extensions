@@ -5,7 +5,7 @@ import {
   type Chapter, type ChapterPage, type Content, type HomePage, type Item,
   type ItemListRequest, type PagedItemList, type SearchRequest, type SourceInfo,
 } from "@suwatte/toolchain/types";
-import { absolute, assertOk, chaptersFrom, document, href, idFrom, image, pageResult, text } from "../../shared";
+import { absolute, assertOk, chaptersFrom, document, href, idFrom, image, pageResult, pathFrom, text } from "../../shared";
 
 const BASE = "https://hentairead.com";
 const scriptImages = (html: string) => {
@@ -22,7 +22,7 @@ const scriptImages = (html: string) => {
 
 export default class HentaiRead {
   static info: SourceInfo = {
-    id: "en.hentairead", name: "HentaiRead", version: 2,
+    id: "en.hentairead", name: "HentaiRead", version: 3,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
@@ -41,7 +41,7 @@ export default class HentaiRead {
     for (const node of root.querySelectorAll(".manga-item")) {
       const link = node.querySelector("h3 a[href*='/hentai/'], a.manga-item__link, a[href*='/hentai/']");
       const url = href(link, BASE);
-      if (!url || !new URL(url).pathname.startsWith("/hentai/")) continue;
+      if (!url || !pathFrom(url).startsWith("/hentai/")) continue;
       const id = idFrom(url, BASE);
       entries.set(id, { id, title: text(link),
         coverImage: image(node.querySelector("img.manga-item__img-inner, img"), BASE),

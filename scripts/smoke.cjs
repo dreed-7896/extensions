@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const { buildSync } = require('esbuild');
 const CryptoJS = require('crypto-js');
 const { ContentSchema, ChapterSchema, PagedItemListSchema, ChapterPageSchema, HomePageSchema } = require('@suwatte/toolchain/validate');
@@ -64,7 +66,27 @@ pages.set(`${BASE_H}/hentai/sample/chapter-1/`, `<div class="reading-content"><i
     HomePageSchema.parse(await source.getHomePage());
     console.log(`PASS ${Source.info.id}`);
   }
-  const fs = require('node:fs');
+  // Evaluate the actual published bundles with the JavaScriptCore-like globals.
+  // Node's normal context supplies atob and URL, hiding missing device globals.
+  for (const [name, id] of [['nhentai', '123'], ['novelcrow', 'comic/sample'], ['hentairead', 'hentai/sample']]) {
+    const sandbox = { console, HttpClient: class {
+      constructor(config) { this.base = config.baseUrl; }
+      async get(path) {
+        const url = new URL(path, this.base).href;
+        const data = pages.get(url);
+        assert.ok(data !== undefined, `Missing fixture: ${url}`);
+        return { status: 200, text: async () => typeof data === 'string' ? data : JSON.stringify(data), json: async () => data };
+      }
+    } };
+    const bundle = fs.readFileSync(`dist/sources/${name}.stt`, 'utf8');
+    const pkg = vm.runInNewContext(`${bundle}\nSourcePackage;`, sandbox, { timeout: 2000 });
+    const source = pkg.bootstrap();
+    assert.equal((await source.getSearchResults({}, 1)).items.length, 1);
+    assert.equal((await source.getContent(id)).title, 'Sample');
+    const chapters = await source.getChapters(id);
+    assert.equal((await source.getChapterPages(id, chapters[0].id)).length, 1);
+    console.log(`PASS bundled ${name}`);
+  }
   const catalog = JSON.parse(fs.readFileSync('dist/sources.json', 'utf8'));
   const readme = fs.readFileSync('README.md', 'utf8');
   const baseUrl = readme.match(/https:\/\/raw\.githubusercontent\.com\/[^\s]+\/dist\b/)?.[0];

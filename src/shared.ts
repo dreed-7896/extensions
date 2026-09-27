@@ -4,9 +4,29 @@ import { ContentRating } from "@suwatte/toolchain/types";
 
 export const adult = ContentRating.MATURE;
 export const document = (html: string) => parse(html);
+export const pathFrom = (url: string): string =>
+  (url.replace(/^https?:\/\/[^/?#]+/i, "").split(/[?#]/)[0] || "/");
 export const absolute = (value: string | undefined, base: string): string => {
-  if (!value || value.startsWith("data:") || value.startsWith("javascript:")) return "";
-  try { return new URL(value, base).href; } catch { return ""; }
+  if (!value) return "";
+  const raw = value.trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("//")) return `${base.match(/^https?:/i)?.[0] ?? "https:"}${raw}`;
+  if (!raw || /^[a-z][a-z\d+.-]*:/i.test(raw) || raw.startsWith("#")) return "";
+  const origin = base.match(/^https?:\/\/[^/?#]+/i)?.[0];
+  if (!origin) return "";
+  const basePath = pathFrom(base);
+  const relative = raw.startsWith("/") ? raw
+    : raw.startsWith("?") ? `${basePath}${raw}`
+    : `${basePath.replace(/\/[^/]*$/, "/")}${raw}`;
+  const boundary = relative.search(/[?#]/);
+  const pathname = boundary < 0 ? relative : relative.slice(0, boundary);
+  const suffix = boundary < 0 ? "" : relative.slice(boundary);
+  const segments: string[] = [];
+  for (const segment of pathname.split("/")) {
+    if (segment === "..") segments.pop();
+    else if (segment && segment !== ".") segments.push(segment);
+  }
+  return `${origin}/${segments.join("/")}${pathname.endsWith("/") && segments.length ? "/" : ""}${suffix}`;
 };
 export const href = (node: HTMLElement | null | undefined, base: string) =>
   absolute(node?.getAttribute("href") ?? undefined, base);
@@ -19,8 +39,7 @@ export const image = (node: HTMLElement | null | undefined, base: string) => {
 };
 export const text = (node: HTMLElement | null | undefined) => node?.text.trim().replace(/\s+/g, " ") ?? "";
 export const idFrom = (url: string, base: string): string => {
-  const path = new URL(url, base).pathname;
-  return path.replace(/^\/+|\/+$/g, "");
+  return pathFrom(absolute(url, base)).replace(/^\/+|\/+$/g, "");
 };
 export const pageResult = (items: Item[], root: HTMLElement, page: number): PagedItemList => ({
   items,

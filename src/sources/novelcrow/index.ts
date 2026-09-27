@@ -6,7 +6,7 @@ import {
   type Chapter, type ChapterPage, type Content, type HomePage, type Item,
   type ItemListRequest, type PagedItemList, type SearchRequest, type SourceInfo,
 } from "@suwatte/toolchain/types";
-import { absolute, assertOk, chaptersFrom, document, href, idFrom, image, pageResult, text } from "../../shared";
+import { absolute, assertOk, chaptersFrom, document, href, idFrom, image, pageResult, pathFrom, text } from "../../shared";
 
 const BASE = "https://novelcrow.com";
 
@@ -33,7 +33,7 @@ export function protectedImages(html: string): string[] {
 
 export default class NovelCrow {
   static info: SourceInfo = {
-    id: "en.novelcrow", name: "NovelCrow", version: 2,
+    id: "en.novelcrow", name: "NovelCrow", version: 3,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
@@ -54,7 +54,7 @@ export default class NovelCrow {
     for (const node of nodes) {
       const link = node.querySelector("div.post-title a, h3 a, a.post-title, a[href*='/comic/']");
       const url = href(link, BASE);
-      if (!url || !new URL(url).pathname.startsWith("/comic/")) continue;
+      if (!url || !pathFrom(url).startsWith("/comic/")) continue;
       const id = idFrom(url, BASE);
       if (unique.has(id)) continue;
       unique.set(id, { id, title: text(link), coverImage: image(node.querySelector(".tab-thumb img, .item-thumb img, img"), BASE),

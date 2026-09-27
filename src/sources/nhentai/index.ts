@@ -24,7 +24,7 @@ const imageUrl = (path: string, thumb = false) =>
 
 export default class NHentai {
   static info: SourceInfo = {
-    id: "en.nhentai", name: "NHentai", version: 2,
+    id: "en.nhentai", name: "NHentai", version: 3,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
