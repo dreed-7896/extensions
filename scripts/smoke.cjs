@@ -12,7 +12,7 @@ function load(entry) {
 
 const pages = new Map();
 global.HttpClient = class {
-  constructor(config) { this.base = config.baseUrl; }
+  constructor(config) { this.base = config.baseUrl; this.cloudflareResolutionURL = config.cloudflareResolutionURL; }
   async get(path) {
     const url = new URL(path, this.base).href;
     const data = pages.get(url);
@@ -47,6 +47,9 @@ pages.set(`${BASE_H}/hentai/sample/chapter-1/`, `<div class="reading-content"><i
   ]) {
     const Source = load(entry);
     const source = new Source();
+    assert.equal(source.client.cloudflareResolutionURL, `${source.client.base}/`);
+    assert.equal(source.getConfiguration().cloudflareResolutionURL, `${source.client.base}/`);
+    assert.equal(source.getConfiguration().useClientForImageRequests, true);
     const list = await source.getSearchResults({}, 1);
     PagedItemListSchema.parse(list);
     assert.equal(list.items.length, 1);
@@ -60,5 +63,33 @@ pages.set(`${BASE_H}/hentai/sample/chapter-1/`, `<div class="reading-content"><i
     ChapterPageSchema.parse(images[0]);
     HomePageSchema.parse(await source.getHomePage());
     console.log(`PASS ${Source.info.id}`);
+  }
+  const fs = require('node:fs');
+  const catalog = JSON.parse(fs.readFileSync('dist/sources.json', 'utf8'));
+  const readme = fs.readFileSync('README.md', 'utf8');
+  const baseUrl = readme.match(/https:\/\/raw\.githubusercontent\.com\/[^\s]+\/dist\b/)?.[0];
+  assert.ok(baseUrl, 'README must give the catalog directory, not sources.json');
+  for (const item of catalog.sources) {
+    const bundle = new URL(`sources/${item.path}.stt`, `${baseUrl}/`);
+    assert.ok(fs.existsSync(`dist/sources/${item.path}.stt`));
+    assert.ok(bundle.pathname.endsWith(`/dist/sources/${item.path}.stt`));
+  }
+  const http = require('node:http');
+  const { HttpClient } = require('@suwatte/toolchain/emulator');
+  const server = http.createServer((_req, response) => {
+    response.writeHead(403, { 'cf-mitigated': 'challenge' });
+    response.end('Checking your browser');
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const client = new HttpClient({
+      baseUrl: `http://127.0.0.1:${server.address().port}`,
+      cloudflareResolutionURL: BASE_H,
+    });
+    await assert.rejects(client.get('/'), (error) =>
+      error.name === 'CloudflareError' && error.resolutionURL === BASE_H);
+    console.log('PASS Cloudflare challenge URL');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -24,14 +24,15 @@ const imageUrl = (path: string, thumb = false) =>
 
 export default class NHentai {
   static info: SourceInfo = {
-    id: "en.nhentai", name: "NHentai", version: 1,
+    id: "en.nhentai", name: "NHentai", version: 2,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
   client = new HttpClient({ baseUrl: BASE, rateLimit: { permits: 2, period: 1 },
-    headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1" },
+    cloudflareResolutionURL: `${BASE}/`,
+    headers: { Referer: `${BASE}/` },
   });
-  getConfiguration() { return { imageReferer: `${BASE}/`, cloudflareResolutionURL: `${BASE}/` }; }
+  getConfiguration() { return { imageReferer: `${BASE}/`, cloudflareResolutionURL: `${BASE}/`, useClientForImageRequests: true }; }
 
   private async gallery(id: string): Promise<Gallery> {
     const path = `/api/v2/galleries/${encodeURIComponent(id)}`;

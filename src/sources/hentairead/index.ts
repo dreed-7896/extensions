@@ -22,14 +22,15 @@ const scriptImages = (html: string) => {
 
 export default class HentaiRead {
   static info: SourceInfo = {
-    id: "en.hentairead", name: "HentaiRead", version: 1,
+    id: "en.hentairead", name: "HentaiRead", version: 2,
     website: BASE, languages: ["en"], rating: ContentRating.MATURE,
     minSupportedAppVersion: "7.0.0",
   };
   client = new HttpClient({ baseUrl: BASE, rateLimit: { permits: 2, period: 1 },
-    headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1" },
+    cloudflareResolutionURL: `${BASE}/`,
+    headers: { Referer: `${BASE}/` },
   });
-  getConfiguration() { return { imageReferer: `${BASE}/`, cloudflareResolutionURL: `${BASE}/` }; }
+  getConfiguration() { return { imageReferer: `${BASE}/`, cloudflareResolutionURL: `${BASE}/`, useClientForImageRequests: true }; }
   private async html(path: string): Promise<string> {
     const response = await this.client.get(path); assertOk(response.status, absolute(path, BASE));
     return response.text();

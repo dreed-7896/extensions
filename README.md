@@ -4,9 +4,9 @@ Sources for NHentai, NovelCrow and HentaiRead. Built with the official `@suwatte
 
 Add this source list in Suwatte **Settings → Sources → Add Source List**:
 
-https://raw.githubusercontent.com/dreed-7896/extensions/suwatte-v7-sources/dist/sources.json
+https://raw.githubusercontent.com/dreed-7896/extensions/suwatte-v7-sources/dist
 
-Then install each source from the list. The catalog and its `.stt` bundles are committed together on the `suwatte-v7-sources` branch, so a separate Pages deployment is not required.
+Enter the catalog **folder address**, without `/sources.json`. Suwatte appends `/sources.json` and resolves each bundle from that folder. Then install each source from the list. The catalog and its `.stt` bundles are committed together on the `suwatte-v7-sources` branch.
 
 ## Updating
 
