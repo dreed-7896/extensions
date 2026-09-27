@@ -5108,7 +5108,7 @@ var SourcePackage = (() => {
         async getSearchResults(request, page) {
           var _a, _b;
           const query = (_b = (_a = request.query) == null ? void 0 : _a.trim()) != null ? _b : "";
-          const path = `${page > 1 ? `/page/${page}/` : "/"}?s=${encodeURIComponent(query)}&post_type=wp-manga`;
+          const path = `${page > 1 ? `/page/${page}/` : "/"}?s=${encodeURIComponent(query)}&title-type=contains&sortby=latest`;
           return this.listing(await this.html(path), page);
         }
         async getHomePage() {

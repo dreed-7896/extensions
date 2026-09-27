@@ -35,7 +35,7 @@ pages.set(`${BASE_C}/comic/sample/`, `<h1>Sample</h1><div class="summary_image">
 const cipher = CryptoJS.AES.encrypt(JSON.stringify(['/page-1.jpg']), 'nonce-example').toString();
 pages.set(`${BASE_C}/comic/sample/chapter-1/`, `<script>var nonce='nonce-example'; var chapter_data='${cipher}';</script>`);
 const BASE_H = 'https://hentairead.com';
-pages.set(`${BASE_H}/?s=&post_type=wp-manga`, `<div class="manga-item"><h3><a href="/hentai/sample/">Sample</a></h3><img src="/cover.jpg"></div>`);
+pages.set(`${BASE_H}/?s=&title-type=contains&sortby=latest`, `<div class="manga-item"><h3><a href="/hentai/sample/">Sample</a></h3><img src="/cover.jpg"></div>`);
 pages.set(`${BASE_H}/hentai/sample/`, `<div class="manga-titles"><h1>Sample</h1></div><meta property="og:image" content="/cover.jpg"><li class="wp-manga-chapter"><a href="/hentai/sample/chapter-1/">Chapter 1</a></li>`);
 pages.set(`${BASE_H}/hentai/sample/chapter-1/`, `<div class="reading-content"><img data-src="/page-1.jpg"></div>`);
 

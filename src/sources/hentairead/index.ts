@@ -50,7 +50,7 @@ export default class HentaiRead {
   }
   async getSearchResults(request: SearchRequest, page: number): Promise<PagedItemList> {
     const query = request.query?.trim() ?? "";
-    const path = `${page > 1 ? `/page/${page}/` : "/"}?s=${encodeURIComponent(query)}&post_type=wp-manga`;
+    const path = `${page > 1 ? `/page/${page}/` : "/"}?s=${encodeURIComponent(query)}&title-type=contains&sortby=latest`;
     return this.listing(await this.html(path), page);
   }
   async getHomePage(): Promise<HomePage> {
