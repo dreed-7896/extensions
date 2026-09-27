@@ -1,10 +1,10 @@
 {
   "name": "suwatte-extensions",
   "version": "1.0.0",
-  "description": "Suwatte v7 source list with ten extensions",
+  "description": "Suwatte v7 source list with the Aidoku sources",
   "scripts": {
     "build": "suwatte build",
-    "check": "tsc --noEmit && node scripts/smoke.cjs && node --import tsx scripts/test-hentairead.ts && node --import tsx scripts/test-r2.ts && node --import tsx scripts/test-cover-ref.ts"
+    "check": "tsc --noEmit && node scripts/smoke.cjs && node scripts/aidoku-ports.cjs && node --import tsx scripts/test-hentairead.ts && node --import tsx scripts/test-r2.ts && node --import tsx scripts/test-cover-ref.ts"
   },
   "repository": {
     "type": "git",

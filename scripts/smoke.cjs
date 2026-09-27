@@ -106,7 +106,7 @@ pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
   }
   console.log('PASS HTTP 200 Cloudflare challenge handling');
   const catalog = JSON.parse(fs.readFileSync('dist/sources.json', 'utf8'));
-  assert.equal(catalog.sources.length, 10, 'combined list must contain all ten sources');
+  assert.equal(catalog.sources.length, 14, 'combined list must contain the ten originals and four Aidoku ports');
   const readme = fs.readFileSync('README.md', 'utf8');
   const baseUrl = readme.match(/https:\/\/raw\.githubusercontent\.com\/[^\s]+\/dist\b/)?.[0];
   assert.ok(baseUrl, 'README must give the catalog directory, not sources.json');
@@ -119,7 +119,7 @@ pages.set(`${BASE_H}/hentai/json/`, `<h1>JSON Gallery</h1>`);
     const pkg = vm.runInNewContext(`${code}\nSourcePackage;`, { console }, { timeout: 3000 });
     assert.equal(typeof pkg.bootstrap, 'function', `${item.id} has no bootstrap`);
   }
-  console.log('PASS all ten bundles evaluate with restricted globals');
+  console.log('PASS all 14 bundles evaluate with restricted globals');
   const http = require('node:http');
   const { HttpClient } = require('@suwatte/toolchain/emulator');
   const server = http.createServer((_req, response) => {

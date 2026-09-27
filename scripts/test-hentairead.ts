@@ -77,6 +77,11 @@ const h3Only = parseListing(
 );
 assert(h3Only[0]?.id === "h3-only-slug", h3Only[0]?.id);
 ItemSchema.parse(h3Only[0]);
+const aidokuTitle = parseListing(
+  `<div class="manga-item"><h3><a title="From title attribute" href="/hentai/attribute-title/"></a></h3><img alt="Cover alt" src="/cover.jpg"></div>`,
+);
+assert(aidokuTitle[0]?.title === "From title attribute", "Aidoku title attribute missing");
+assert(CF_RESOLVE === "https://hentairead.com/", "challenge must resolve at the site root");
 
 assert(
   parseMangaId("https://hentairead.com/hentai/foo-bar/") === "foo-bar",
@@ -231,7 +236,7 @@ const main = async () => {
     ),
   });
 
-  assert(/assertCloudflareCleared/.test(src), "homepage must probe CF like NovelCrow");
+  assert(!/assertCloudflareCleared/.test(src), "homepage must not run an extra challenge probe");
   assert(!/rateLimit\s*:/.test(src), "rateLimit hung listing after Resolve");
   try {
     const home = await source.getHomePage();

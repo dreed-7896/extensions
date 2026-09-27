@@ -21,7 +21,6 @@ import {
 import { ContentRating } from "@suwatte/toolchain/types";
 import { createProtectedClient } from "../_shared/client";
 import {
-  assertCloudflareCleared,
   cloudflareFromHeaders,
   looksLikeCloudflare,
   throwCloudflare,
@@ -85,7 +84,7 @@ const cloudflareFromThrown = (error: unknown): boolean => {
  * CF throws.
  *
  * Keiyoushi has no CF code — Mihon's interceptor is app-side. Same split here.
- * Nested listing URL: WKWebView often blanks on `/`.
+ * Resolve on the same origin as the native listing request.
  */
 export default class Target {
   client = (() => {
@@ -103,7 +102,7 @@ export default class Target {
   static info: SourceInfo = {
     id: "en.hentairead",
     name: "HentaiRead",
-    version: 5,
+    version: 6,
     website: BASE,
     thumbnail: "hentairead.png",
     languages: ["en"],
@@ -122,7 +121,7 @@ export default class Target {
       {
         header: "Cloudflare",
         footer:
-          "Same path as NovelCrow: open the source so Resolve runs, complete the check, then the Latest tab loads. Availability still aborts on CF by design. If Latest stays on grey tiles after Resolve: Settings → Advanced → Clear Network Cache, Open Challenge Page, pull to refresh. Safari cookies are not this source's jar.",
+          "Complete the website check, then refresh the source. If the check repeats, open the challenge page here.",
         views: [
           UIWebViewButton({
             title: "Open Challenge Page",
@@ -197,9 +196,6 @@ export default class Target {
   };
 
   getHomePage = async (): Promise<HomePage> => {
-    // NovelCrow: probe before feeds so Resolve runs *before* Latest paints
-    // skeletons. Empty getHomePage + CF on getItemList left the grid loading.
-    await assertCloudflareCleared(this.client, CF_RESOLVE);
     return {
       feeds: [
         {

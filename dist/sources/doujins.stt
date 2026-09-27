@@ -787,599 +787,6 @@ var SourcePackage = (() => {
     }
   });
 
-  // __temp__/sources/_shared/client.js
-  var require_client2 = __commonJS({
-    "__temp__/sources/_shared/client.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.createProtectedClient = exports.browserHeaders = exports.BROWSER_ACCEPT_LANGUAGE = exports.BROWSER_ACCEPT = void 0;
-      exports.BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8";
-      exports.BROWSER_ACCEPT_LANGUAGE = "en-US,en;q=0.9";
-      var browserHeaders = (extras = {}) => ({
-        Accept: exports.BROWSER_ACCEPT,
-        "Accept-Language": exports.BROWSER_ACCEPT_LANGUAGE,
-        ...extras
-      });
-      exports.browserHeaders = browserHeaders;
-      var createProtectedClient = (resolutionURL, extras = {}) => new HttpClient({
-        timeout: 45e3,
-        cloudflareResolutionURL: resolutionURL,
-        headers: (0, exports.browserHeaders)({
-          Referer: resolutionURL.endsWith("/") ? resolutionURL : `${resolutionURL}/`,
-          ...extras
-        })
-      });
-      exports.createProtectedClient = createProtectedClient;
-    }
-  });
-
-  // __temp__/sources/_shared/cloudflare.js
-  var require_cloudflare = __commonJS({
-    "__temp__/sources/_shared/cloudflare.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.assertCloudflareCleared = exports.cloudflareFromHeaders = exports.originOf = exports.looksLikeCloudflare = exports.isCloudflareError = exports.throwCloudflare = void 0;
-      var throwCloudflare = (resolutionURL) => {
-        throw new CloudflareError(resolutionURL);
-      };
-      exports.throwCloudflare = throwCloudflare;
-      var isCloudflareError = (error) => {
-        var _a, _b;
-        const name = String((_a = error == null ? void 0 : error.name) != null ? _a : "");
-        const message = String((_b = error == null ? void 0 : error.message) != null ? _b : error);
-        return name.includes("Cloudflare") || message.includes("Cloudflare") || message.includes("cloudflare");
-      };
-      exports.isCloudflareError = isCloudflareError;
-      var looksLikeCloudflare = (body) => /just a moment|cf-mitigated|challenge-platform|cdn-cgi\/challenge|cf-chl|cf-turnstile|challenges\.cloudflare\.com|attention required|verify you are human|checking your browser|enable javascript and cookies/i.test(body);
-      exports.looksLikeCloudflare = looksLikeCloudflare;
-      var originOf = (url) => {
-        const match = /^(https?:\/\/[^/?#]+)/i.exec(url);
-        return (match == null ? void 0 : match[1]) ? `${match[1]}/` : url;
-      };
-      exports.originOf = originOf;
-      var header = (headers, name) => {
-        var _a;
-        if (!headers)
-          return "";
-        if (typeof headers.get === "function") {
-          return String((_a = headers.get(name)) != null ? _a : "").toLowerCase();
-        }
-        const obj = headers;
-        const want = name.toLowerCase();
-        for (const [key, value] of Object.entries(obj)) {
-          if (key.toLowerCase() === want)
-            return String(value != null ? value : "").toLowerCase();
-        }
-        return "";
-      };
-      var cloudflareFromHeaders = (status, headers) => {
-        if (header(headers, "cf-mitigated").includes("challenge"))
-          return true;
-        if (header(headers, "server").includes("cloudflare") && [403, 503, 429].includes(status)) {
-          return true;
-        }
-        const location = header(headers, "location");
-        if (location.includes("cdn-cgi/challenge"))
-          return true;
-        return false;
-      };
-      exports.cloudflareFromHeaders = cloudflareFromHeaders;
-      var assertCloudflareCleared = async (client, resolutionURL, probeURLs = [resolutionURL]) => {
-        var _a, _b;
-        const urls = probeURLs.length ? probeURLs : [resolutionURL];
-        for (const url of urls) {
-          try {
-            const response = await client.request({
-              url,
-              method: "GET",
-              timeout: 2e4
-            });
-            if ((0, exports.cloudflareFromHeaders)(response.status, response.headers)) {
-              (0, exports.throwCloudflare)(resolutionURL);
-            }
-            const body = await response.text();
-            if ((0, exports.looksLikeCloudflare)(body) || (0, exports.cloudflareFromHeaders)(response.status, response.headers)) {
-              (0, exports.throwCloudflare)(resolutionURL);
-            }
-            if (!response.ok && header(response.headers, "server").includes("cloudflare")) {
-              (0, exports.throwCloudflare)(resolutionURL);
-            }
-            if (response.ok)
-              return;
-          } catch (error) {
-            const message = String((_a = error == null ? void 0 : error.message) != null ? _a : error);
-            const name = String((_b = error == null ? void 0 : error.name) != null ? _b : "");
-            if (name.includes("Cloudflare") || message.includes("Cloudflare") || message.includes("cloudflare")) {
-              (0, exports.throwCloudflare)(resolutionURL);
-            }
-          }
-        }
-        (0, exports.throwCloudflare)(resolutionURL);
-      };
-      exports.assertCloudflareCleared = assertCloudflareCleared;
-    }
-  });
-
-  // __temp__/sources/_shared/http.js
-  var require_http2 = __commonJS({
-    "__temp__/sources/_shared/http.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.withQuery = exports.joinUrl = exports.absoluteUrl = exports.getJson = exports.getText = exports.fetchBytesRange = exports.fetchBytes = exports.fetchJson = exports.postEmpty = exports.postForm = exports.fetchText = exports.bindSourceHttpClient = exports.http = void 0;
-      var cloudflare_1 = require_cloudflare();
-      var fallbackClient;
-      var boundClient;
-      var http = () => {
-        if (!fallbackClient) {
-          fallbackClient = new HttpClient({
-            timeout: 45e3,
-            validateStatus: () => true
-          });
-        }
-        return fallbackClient;
-      };
-      exports.http = http;
-      var bindSourceHttpClient = (client) => {
-        boundClient = client;
-      };
-      exports.bindSourceHttpClient = bindSourceHttpClient;
-      var resolveClient = (options) => {
-        var _a, _b;
-        return (_b = (_a = options == null ? void 0 : options.client) != null ? _a : boundClient) != null ? _b : (0, exports.http)();
-      };
-      var cloudflareResponse = (error) => error.response;
-      var rethrowCloudflare = async (error, url, resolutionURL) => {
-        var _a, _b, _c;
-        const resolution = resolutionURL != null ? resolutionURL : (0, cloudflare_1.originOf)(url);
-        if ((0, cloudflare_1.isCloudflareError)(error))
-          (0, cloudflare_1.throwCloudflare)(resolution);
-        const response = cloudflareResponse(error);
-        if (response) {
-          const body = (_b = await ((_a = response.text) == null ? void 0 : _a.call(response).catch(() => ""))) != null ? _b : "";
-          if ((0, cloudflare_1.looksLikeCloudflare)(body) || (0, cloudflare_1.cloudflareFromHeaders)((_c = response.status) != null ? _c : 0, response.headers)) {
-            (0, cloudflare_1.throwCloudflare)(resolution);
-          }
-        }
-        throw error;
-      };
-      var mergeHeaders = (options) => {
-        var _a;
-        const headers = { ...(_a = options == null ? void 0 : options.headers) != null ? _a : {} };
-        if (options == null ? void 0 : options.referer)
-          headers.Referer = options.referer;
-        return Object.keys(headers).length ? headers : void 0;
-      };
-      var assertNotCloudflare = (url, status, body, headers, resolutionURL) => {
-        const resolution = resolutionURL != null ? resolutionURL : (0, cloudflare_1.originOf)(url);
-        if ((0, cloudflare_1.cloudflareFromHeaders)(status, headers) || (0, cloudflare_1.looksLikeCloudflare)(body)) {
-          (0, cloudflare_1.throwCloudflare)(resolution);
-        }
-      };
-      var fetchText = async (url, options) => {
-        var _a;
-        try {
-          const response = await resolveClient(options).request({
-            url,
-            method: "GET",
-            headers: mergeHeaders(options),
-            timeout: options == null ? void 0 : options.timeout,
-            cloudflareResolutionURL: options == null ? void 0 : options.cloudflareResolutionURL
-          });
-          if ((0, cloudflare_1.cloudflareFromHeaders)(response.status, response.headers)) {
-            (0, cloudflare_1.throwCloudflare)((_a = options == null ? void 0 : options.cloudflareResolutionURL) != null ? _a : (0, cloudflare_1.originOf)(url));
-          }
-          const body = await response.text();
-          assertNotCloudflare(url, response.status, body, response.headers, options == null ? void 0 : options.cloudflareResolutionURL);
-          if (!response.ok) {
-            throw new Error(`GET ${url} failed (${response.status}): ${body.slice(0, 180)}`);
-          }
-          return body;
-        } catch (error) {
-          return rethrowCloudflare(error, url, options == null ? void 0 : options.cloudflareResolutionURL);
-        }
-      };
-      exports.fetchText = fetchText;
-      var postForm = async (url, fields, options) => {
-        var _a;
-        const entries = Array.isArray(fields) ? fields : Object.entries(fields);
-        const body = entries.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
-        const response = await resolveClient(options).request({
-          url,
-          method: "POST",
-          body,
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            ...mergeHeaders(options)
-          }
-        });
-        if ((0, cloudflare_1.cloudflareFromHeaders)(response.status, response.headers)) {
-          (0, cloudflare_1.throwCloudflare)((_a = options == null ? void 0 : options.cloudflareResolutionURL) != null ? _a : (0, cloudflare_1.originOf)(url));
-        }
-        const text = await response.text();
-        assertNotCloudflare(url, response.status, text, response.headers, options == null ? void 0 : options.cloudflareResolutionURL);
-        if (!response.ok) {
-          throw new Error(`POST ${url} failed (${response.status}): ${text.slice(0, 180)}`);
-        }
-        return text;
-      };
-      exports.postForm = postForm;
-      var postEmpty = async (url, options) => {
-        var _a;
-        const response = await resolveClient(options).request({
-          url,
-          method: "POST",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            ...mergeHeaders(options)
-          }
-        });
-        if ((0, cloudflare_1.cloudflareFromHeaders)(response.status, response.headers)) {
-          (0, cloudflare_1.throwCloudflare)((_a = options == null ? void 0 : options.cloudflareResolutionURL) != null ? _a : (0, cloudflare_1.originOf)(url));
-        }
-        const text = await response.text();
-        assertNotCloudflare(url, response.status, text, response.headers, options == null ? void 0 : options.cloudflareResolutionURL);
-        if (!response.ok) {
-          throw new Error(`POST ${url} failed (${response.status}): ${text.slice(0, 180)}`);
-        }
-        return text;
-      };
-      exports.postEmpty = postEmpty;
-      var fetchJson = async (url, options) => JSON.parse(await (0, exports.fetchText)(url, options));
-      exports.fetchJson = fetchJson;
-      var fetchBytes = async (url, options) => {
-        var _a;
-        try {
-          const response = await resolveClient(options).request({
-            url,
-            method: "GET",
-            headers: mergeHeaders(options),
-            timeout: options == null ? void 0 : options.timeout
-          });
-          if (!response.ok) {
-            const body = await response.text();
-            assertNotCloudflare(url, response.status, body, response.headers, options == null ? void 0 : options.cloudflareResolutionURL);
-            throw new Error(`GET ${url} failed (${response.status}): ${body.slice(0, 180)}`);
-          }
-          if (response.headers.get("cf-mitigated")) {
-            (0, cloudflare_1.throwCloudflare)((_a = options == null ? void 0 : options.cloudflareResolutionURL) != null ? _a : (0, cloudflare_1.originOf)(url));
-          }
-          return response.bytes();
-        } catch (error) {
-          return rethrowCloudflare(error, url, options == null ? void 0 : options.cloudflareResolutionURL);
-        }
-      };
-      exports.fetchBytes = fetchBytes;
-      var fetchBytesRange = async (url, range, options) => {
-        var _a;
-        const headers = { ...(_a = mergeHeaders(options)) != null ? _a : {} };
-        if (range) {
-          headers.Range = `bytes=${range.start}-${range.end}`;
-        }
-        const response = await resolveClient(options).request({
-          url,
-          method: "GET",
-          headers,
-          timeout: options == null ? void 0 : options.timeout
-        });
-        if (!(response.ok || response.status === 206)) {
-          const body = await response.text();
-          assertNotCloudflare(url, response.status, body, response.headers, options == null ? void 0 : options.cloudflareResolutionURL);
-          throw new Error(`GET ${url} failed (${response.status}): ${body.slice(0, 180)}`);
-        }
-        return response.bytes();
-      };
-      exports.fetchBytesRange = fetchBytesRange;
-      exports.getText = exports.fetchText;
-      exports.getJson = exports.fetchJson;
-      var absoluteUrl = (base, maybeRelative) => {
-        var _a, _b;
-        const value = maybeRelative.trim();
-        if (!value)
-          return value;
-        if (/^https?:\/\//i.test(value) || value.startsWith("data:"))
-          return value;
-        if (value.startsWith("//")) {
-          const protocol = base.startsWith("https") ? "https:" : "http:";
-          return `${protocol}${value}`;
-        }
-        const origin = (_b = (_a = base.match(/^(https?:\/\/[^/?#]+)/i)) == null ? void 0 : _a[1]) != null ? _b : base;
-        if (value.startsWith("/"))
-          return `${origin}${value}`;
-        return `${origin}/${value}`;
-      };
-      exports.absoluteUrl = absoluteUrl;
-      var joinUrl = (base, ...parts) => {
-        let url = base.replace(/\/+$/, "");
-        for (const part of parts) {
-          const cleaned = part.replace(/^\/+|\/+$/g, "");
-          if (!cleaned)
-            continue;
-          url += `/${cleaned}`;
-        }
-        return url;
-      };
-      exports.joinUrl = joinUrl;
-      var withQuery = (url, params) => {
-        const pairs = Object.entries(params).filter((entry) => entry[1] != null);
-        if (!pairs.length)
-          return url;
-        const query = pairs.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
-        return url.includes("?") ? `${url}&${query}` : `${url}?${query}`;
-      };
-      exports.withQuery = withQuery;
-    }
-  });
-
-  // __temp__/sources/hentairead/constants.js
-  var require_constants = __commonJS({
-    "__temp__/sources/hentairead/constants.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.TEXT_FILTERS = exports.TYPES = exports.SORTS = exports.IMAGE_ACCEPT = exports.CF_RESOLVE = exports.MANGA = exports.BASE = void 0;
-      exports.BASE = "https://hentairead.com";
-      exports.MANGA = "hentai";
-      exports.CF_RESOLVE = `${exports.BASE}/`;
-      exports.IMAGE_ACCEPT = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
-      exports.SORTS = [
-        { id: "new", title: "Latest" },
-        { id: "alphabet", title: "A-Z" },
-        { id: "rating", title: "Rating" },
-        { id: "views", title: "Views" }
-      ];
-      exports.TYPES = [
-        { id: "4", title: "Doujinshi" },
-        { id: "52", title: "Manga" },
-        { id: "4798", title: "Artist CG" },
-        { id: "36278", title: "Western" }
-      ];
-      exports.TEXT_FILTERS = [
-        { id: "tags", name: "Tags", type: "manga_tag", hint: "Comma-separated. Prefix with - to exclude." },
-        { id: "artists", name: "Artists", type: "artist", hint: "Comma-separated" },
-        { id: "circles", name: "Circles", type: "circle", hint: "Comma-separated" },
-        { id: "characters", name: "Characters", type: "character", hint: "Comma-separated" },
-        { id: "collections", name: "Collections", type: "collection", hint: "Comma-separated" },
-        { id: "scanlators", name: "Scanlators", type: "scanlator", hint: "Comma-separated" },
-        { id: "conventions", name: "Conventions", type: "convention", hint: "Comma-separated" }
-      ];
-    }
-  });
-
-  // __temp__/sources/_shared/base64.js
-  var require_base64 = __commonJS({
-    "__temp__/sources/_shared/base64.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.base64Decode = exports.bytesToBase64 = void 0;
-      var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-      var decodeMap = (() => {
-        const map = new Uint8Array(128);
-        map.fill(255);
-        for (let i = 0; i < alphabet.length; i += 1) {
-          map[alphabet.charCodeAt(i)] = i;
-        }
-        return map;
-      })();
-      var bytesToBase64 = (bytes) => {
-        let output = "";
-        const length = bytes.length;
-        for (let i = 0; i < length; i += 3) {
-          const a = bytes[i];
-          const b = i + 1 < length ? bytes[i + 1] : 0;
-          const c = i + 2 < length ? bytes[i + 2] : 0;
-          const triplet = a << 16 | b << 8 | c;
-          output += alphabet[triplet >> 18 & 63];
-          output += alphabet[triplet >> 12 & 63];
-          output += i + 1 < length ? alphabet[triplet >> 6 & 63] : "=";
-          output += i + 2 < length ? alphabet[triplet & 63] : "=";
-        }
-        return output;
-      };
-      exports.bytesToBase64 = bytesToBase64;
-      var base64Decode = (value) => {
-        var _a, _b, _c, _d;
-        const cleaned = value.replace(/[^A-Za-z0-9+/=]/g, "");
-        if (!cleaned)
-          return "";
-        const bytes = [];
-        for (let i = 0; i < cleaned.length; i += 4) {
-          const enc1 = (_a = decodeMap[cleaned.charCodeAt(i)]) != null ? _a : 255;
-          const enc2 = (_b = decodeMap[cleaned.charCodeAt(i + 1)]) != null ? _b : 255;
-          const enc3 = cleaned[i + 2] === "=" ? 64 : (_c = decodeMap[cleaned.charCodeAt(i + 2)]) != null ? _c : 255;
-          const enc4 = cleaned[i + 3] === "=" ? 64 : (_d = decodeMap[cleaned.charCodeAt(i + 3)]) != null ? _d : 255;
-          if (enc1 === 255 || enc2 === 255 || enc3 === 255 || enc4 === 255) {
-            throw new Error("Invalid base64 input");
-          }
-          bytes.push(enc1 << 2 | enc2 >> 4);
-          if (enc3 !== 64)
-            bytes.push((enc2 & 15) << 4 | enc3 >> 2);
-          if (enc4 !== 64)
-            bytes.push((enc3 & 3) << 6 | enc4);
-        }
-        let result = "";
-        for (let i = 0; i < bytes.length; ) {
-          const c = bytes[i];
-          if (c < 128) {
-            result += String.fromCharCode(c);
-            i += 1;
-          } else if (c < 224 && i + 1 < bytes.length) {
-            result += String.fromCharCode((c & 31) << 6 | bytes[i + 1] & 63);
-            i += 2;
-          } else if (c < 240 && i + 2 < bytes.length) {
-            result += String.fromCharCode((c & 15) << 12 | (bytes[i + 1] & 63) << 6 | bytes[i + 2] & 63);
-            i += 3;
-          } else if (i + 3 < bytes.length) {
-            const code = (c & 7) << 18 | (bytes[i + 1] & 63) << 12 | (bytes[i + 2] & 63) << 6 | bytes[i + 3] & 63;
-            const offset = code - 65536;
-            result += String.fromCharCode(55296 + (offset >> 10), 56320 + (offset & 1023));
-            i += 4;
-          } else {
-            break;
-          }
-        }
-        return result;
-      };
-      exports.base64Decode = base64Decode;
-    }
-  });
-
-  // __temp__/sources/_shared/html.js
-  var require_html = __commonJS({
-    "__temp__/sources/_shared/html.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.base64Decode = exports.imageFromTag = exports.metaContent = exports.collectBlocks = exports.innerHtml = exports.allMatches = exports.firstMatch = exports.attr = exports.stripTags = exports.decodeEntities = void 0;
-      var decodeEntities = (value) => value.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
-      exports.decodeEntities = decodeEntities;
-      var stripTags = (value) => (0, exports.decodeEntities)(value.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
-      exports.stripTags = stripTags;
-      var attr = (tag, name) => {
-        var _a, _b;
-        const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
-        const raw = (_b = (_a = match == null ? void 0 : match[1]) != null ? _a : match == null ? void 0 : match[2]) != null ? _b : match == null ? void 0 : match[3];
-        return raw == null ? void 0 : (0, exports.decodeEntities)(raw);
-      };
-      exports.attr = attr;
-      var firstMatch = (html, pattern) => {
-        const match = pattern.exec(html);
-        return match == null ? void 0 : match[1];
-      };
-      exports.firstMatch = firstMatch;
-      var allMatches = (html, pattern) => {
-        const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
-        const global2 = new RegExp(pattern.source, flags);
-        const values = [];
-        let match;
-        while (match = global2.exec(html)) {
-          if (match[1] != null)
-            values.push(match[1]);
-        }
-        return values;
-      };
-      exports.allMatches = allMatches;
-      var innerHtml = (html, openTagPattern) => {
-        var _a, _b;
-        const open = openTagPattern.exec(html);
-        if (!open || open.index == null)
-          return void 0;
-        const start = open.index + open[0].length;
-        const tagName = (_b = (_a = open[0].match(/^<\/?([a-z0-9]+)/i)) == null ? void 0 : _a[1]) == null ? void 0 : _b.toLowerCase();
-        if (!tagName)
-          return void 0;
-        const rest = html.slice(start);
-        const close = new RegExp(`</${tagName}\\s*>`, "i").exec(rest);
-        return close ? rest.slice(0, close.index) : rest;
-      };
-      exports.innerHtml = innerHtml;
-      var collectBlocks = (html, openPattern, tagName) => {
-        const flags = openPattern.flags.includes("g") ? openPattern.flags : `${openPattern.flags}g`;
-        const global2 = new RegExp(openPattern.source, flags);
-        const openTag = new RegExp(`<${tagName}\\b`, "gi");
-        const closeTag = new RegExp(`</${tagName}\\s*>`, "gi");
-        const blocks = [];
-        let match;
-        while (match = global2.exec(html)) {
-          const start = match.index;
-          let depth = 1;
-          let cursor = start + match[0].length;
-          while (cursor < html.length && depth > 0) {
-            openTag.lastIndex = cursor;
-            closeTag.lastIndex = cursor;
-            const nextOpen = openTag.exec(html);
-            const nextClose = closeTag.exec(html);
-            if (!nextClose) {
-              cursor = html.length;
-              break;
-            }
-            if (nextOpen && nextOpen.index < nextClose.index) {
-              depth += 1;
-              cursor = nextOpen.index + nextOpen[0].length;
-            } else {
-              depth -= 1;
-              cursor = nextClose.index + nextClose[0].length;
-            }
-          }
-          blocks.push(html.slice(start, cursor));
-          global2.lastIndex = cursor;
-        }
-        return blocks;
-      };
-      exports.collectBlocks = collectBlocks;
-      var metaContent = (html, property) => {
-        var _a;
-        const pattern = new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["']`, "i");
-        const match = pattern.exec(html);
-        return (_a = match == null ? void 0 : match[1]) != null ? _a : match == null ? void 0 : match[2];
-      };
-      exports.metaContent = metaContent;
-      var imageFromTag = (imgTag) => {
-        var _a, _b, _c;
-        const candidates = [
-          (0, exports.attr)(imgTag, "data-src"),
-          (0, exports.attr)(imgTag, "data-lazy-src"),
-          (0, exports.attr)(imgTag, "data-cfsrc")
-        ];
-        const srcset = (_a = (0, exports.attr)(imgTag, "srcset")) != null ? _a : (0, exports.attr)(imgTag, "data-srcset");
-        if (srcset) {
-          const best = srcset.split(",").map((part) => {
-            const [url, width] = part.trim().split(/\s+/);
-            return {
-              url: url != null ? url : "",
-              width: Number.parseInt((width != null ? width : "0").replace(/\D/g, ""), 10) || 0
-            };
-          }).sort((a, b) => b.width - a.width)[0];
-          if (best == null ? void 0 : best.url)
-            candidates.push(best.url);
-        }
-        candidates.push((0, exports.attr)(imgTag, "src"));
-        return (_c = (_b = candidates.find((value) => !!(value == null ? void 0 : value.trim()))) == null ? void 0 : _b.trim()) != null ? _c : "";
-      };
-      exports.imageFromTag = imageFromTag;
-      var base64_1 = require_base64();
-      Object.defineProperty(exports, "base64Decode", { enumerable: true, get: function() {
-        return base64_1.base64Decode;
-      } });
-    }
-  });
-
-  // __temp__/sources/_shared/item.js
-  var require_item2 = __commonJS({
-    "__temp__/sources/_shared/item.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.PAGE_SIZE = exports.pageSize = exports.matureItem = exports.itemFrom = void 0;
-      var types_1 = require_types();
-      var itemFrom = (id, title, coverImage, rating = types_1.ContentRating.MATURE) => ({
-        id,
-        title,
-        coverImage,
-        rating
-      });
-      exports.itemFrom = itemFrom;
-      var matureItem = (options) => ({
-        ...(0, exports.itemFrom)(options.id, options.title, options.coverImage),
-        subtitle: options.subtitle,
-        webUrl: options.webUrl
-      });
-      exports.matureItem = matureItem;
-      exports.pageSize = 24;
-      exports.PAGE_SIZE = exports.pageSize;
-    }
-  });
-
   // node_modules/he/he.js
   var require_he = __commonJS({
     "node_modules/he/he.js"(exports, module) {
@@ -6403,7 +5810,7 @@ var SourcePackage = (() => {
   });
 
   // node_modules/node-html-parser/dist/nodes/html.js
-  var require_html2 = __commonJS({
+  var require_html = __commonJS({
     "node_modules/node-html-parser/dist/nodes/html.js"(exports) {
       "use strict";
       init_Buffer();
@@ -7491,7 +6898,7 @@ var SourcePackage = (() => {
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
       exports.default = void 0;
-      var html_1 = require_html2();
+      var html_1 = require_html();
       Object.defineProperty(exports, "default", { enumerable: true, get: function() {
         return html_1.parse;
       } });
@@ -7505,7 +6912,7 @@ var SourcePackage = (() => {
       init_Buffer();
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
-      var html_1 = require_html2();
+      var html_1 = require_html();
       function valid(data, options) {
         if (options === void 0) {
           options = {};
@@ -7530,7 +6937,7 @@ var SourcePackage = (() => {
       exports.NodeType = exports.TextNode = exports.Node = exports.valid = exports.CommentNode = exports.HTMLElement = exports.parse = void 0;
       var comment_1 = __importDefault(require_comment());
       exports.CommentNode = comment_1.default;
-      var html_1 = __importDefault(require_html2());
+      var html_1 = __importDefault(require_html());
       exports.HTMLElement = html_1.default;
       var node_1 = __importDefault(require_node());
       exports.Node = node_1.default;
@@ -7669,697 +7076,148 @@ var SourcePackage = (() => {
     }
   });
 
-  // __temp__/sources/hentairead/parse.js
-  var require_parse4 = __commonJS({
-    "__temp__/sources/hentairead/parse.js"(exports) {
-      "use strict";
-      init_Buffer();
-      init_process();
-      Object.defineProperty(exports, "__esModule", { value: true });
-      exports.readerLanguageOrder = exports.parseChapterPages = exports.parsePageRange = exports.parseDetails = exports.parseUploadedDate = exports.parseGalleryId = exports.parseLanguages = exports.taxonomyNames = exports.parseListing = exports.hasNextPage = exports.readerUrl = exports.contentUrl = exports.searchUrl = exports.listingUrl = exports.parseMangaId = void 0;
-      var types_1 = require_types();
-      var html_1 = require_html();
-      var http_1 = require_http2();
-      var item_1 = require_item2();
-      var constants_1 = require_constants();
-      var shared_1 = require_shared();
-      var CARD_OPEN = /<div\b[^>]*class=["'](?:[^"']*\s)?manga-item(?:\s[^"']*)?["'][^>]*>/gi;
-      var TITLE_LINK = /<a\b([^>]*\bmanga-item__link\b[^>]*)>([\s\S]*?)<\/a>/i;
-      var COVER_IMG = /(<img\b[^>]*\bmanga-item__img-inner\b[^>]*>)/i;
-      var BASE64_JSON = /eyJ[A-Za-z0-9+/=]{16,}/g;
-      var parseMangaId = (href) => {
-        const cleaned = href.replace(/[?#].*$/, "").replace(/\/+$/, "");
-        const match = cleaned.match(/\/hentai\/([^/]+)/i);
-        if (match == null ? void 0 : match[1])
-          return decodeURIComponent(match[1]);
-        const last = cleaned.split("/").filter(Boolean).pop();
-        return last ? decodeURIComponent(last) : cleaned;
-      };
-      exports.parseMangaId = parseMangaId;
-      var listingUrl = (page, sortby) => {
-        const path = page <= 1 ? `${constants_1.BASE}/${constants_1.MANGA}/` : `${constants_1.BASE}/${constants_1.MANGA}/page/${page}/`;
-        return `${path}?sortby=${encodeURIComponent(sortby)}`;
-      };
-      exports.listingUrl = listingUrl;
-      var searchUrl = (page, pairs) => {
-        const path = `${constants_1.BASE}/page/${Math.max(1, page)}/`;
-        if (!pairs.length)
-          return path;
-        const query = pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
-        return `${path}?${query}`;
-      };
-      exports.searchUrl = searchUrl;
-      var contentUrl = (contentId) => `${constants_1.BASE}/${constants_1.MANGA}/${encodeURI(contentId).replace(/%2F/gi, "/")}/`;
-      exports.contentUrl = contentUrl;
-      var readerUrl = (contentId, language = "english") => {
-        const base = (0, exports.contentUrl)(contentId);
-        if (!language)
-          return `${base}p/1/`;
-        return `${base}${language}/p/1/`;
-      };
-      exports.readerUrl = readerUrl;
-      var hasNextPage = (html) => /<a\b[^>]*rel=["']next["']/i.test(html) || /class=["'][^"']*\bnextpostslink\b/i.test(html) || /class=["'][^"']*\bnext\b[^"']*\bpage-numbers\b/i.test(html);
-      exports.hasNextPage = hasNextPage;
-      var isUsableImage = (src) => !!src && !src.startsWith("data:") && !/placeholder|blank\.|spacer|1x1|logo|spinner|icon|avatar/i.test(src);
-      var listingCover = (imgTag) => {
-        var _a;
-        const src = ((_a = (0, html_1.attr)(imgTag, "src")) != null ? _a : "").trim();
-        if (isUsableImage(src))
-          return src;
-        return (0, html_1.imageFromTag)(imgTag);
-      };
-      var itemFromCard = (card) => {
-        var _a, _b, _c;
-        const link = TITLE_LINK.exec(card);
-        if (!link)
-          return void 0;
-        const tag = `<a ${link[1]}>`;
-        const href = (_a = (0, html_1.attr)(tag, "href")) != null ? _a : "";
-        const title = (0, html_1.stripTags)((_b = link[2]) != null ? _b : "") || (0, html_1.attr)(tag, "title") || "";
-        if (!href || !title)
-          return void 0;
-        const id = (0, exports.parseMangaId)(href);
-        if (!id || /\/page\/\d+/i.test(href))
-          return void 0;
-        const imgTag = (_c = (0, html_1.firstMatch)(card, COVER_IMG)) != null ? _c : (0, html_1.firstMatch)(card, /(<img\b[^>]*>)/i);
-        const cover = imgTag ? listingCover(imgTag) : "";
-        return (0, item_1.matureItem)({
-          id,
-          title,
-          coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : void 0,
-          webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
-        });
-      };
-      var parseListing = (html) => {
-        var _a, _b, _c, _d, _e, _f, _g;
-        const items = [];
-        const seen = /* @__PURE__ */ new Set();
-        for (const card of (0, shared_1.document)(html).querySelectorAll("div.manga-item")) {
-          const link = card.querySelector("h3 a[href*='/hentai/']");
-          const href = (_a = link == null ? void 0 : link.getAttribute("href")) != null ? _a : "";
-          if (!href || /\/page\/\d+/i.test(href))
-            continue;
-          const id = (0, exports.parseMangaId)(href);
-          if (!id || seen.has(id))
-            continue;
-          const cover = card.querySelector("img.manga-item__img-inner, img");
-          const title = ((_b = link == null ? void 0 : link.getAttribute("title")) == null ? void 0 : _b.trim()) || (0, shared_1.text)(link) || ((_c = cover == null ? void 0 : cover.getAttribute("alt")) == null ? void 0 : _c.trim()) || id.replace(/[-_]+/g, " ");
-          const coverUrl = cover ? listingCover(cover.outerHTML) : "";
-          seen.add(id);
-          items.push((0, item_1.matureItem)({
-            id,
-            title,
-            coverImage: coverUrl ? (0, http_1.absoluteUrl)(constants_1.BASE, coverUrl) : void 0,
-            webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
-          }));
-        }
-        if (items.length)
-          return items;
-        const cards = (0, html_1.collectBlocks)(html, CARD_OPEN, "div");
-        const chunks = cards.length ? cards : html.split(/(?=<div\b[^>]*class=["'](?:[^"']*\s)?manga-item(?:\s))/i);
-        for (const chunk of chunks) {
-          const item = itemFromCard(chunk);
-          if (!item || seen.has(item.id))
-            continue;
-          seen.add(item.id);
-          items.push(item);
-        }
-        if (items.length)
-          return items;
-        const linkRe = /<a\b([^>]*\bmanga-item__link\b[^>]*)>([\s\S]*?)<\/a>/gi;
-        let match;
-        while (match = linkRe.exec(html)) {
-          const tag = `<a ${match[1]}>`;
-          const href = (_d = (0, html_1.attr)(tag, "href")) != null ? _d : "";
-          const title = (0, html_1.stripTags)((_e = match[2]) != null ? _e : "") || (0, html_1.attr)(tag, "title") || "";
-          if (!href || !title)
-            continue;
-          const id = (0, exports.parseMangaId)(href);
-          if (!id || seen.has(id) || /\/page\/\d+/i.test(href))
-            continue;
-          seen.add(id);
-          const before = html.slice(Math.max(0, match.index - 24e3), match.index);
-          const imgs = before.match(/<img\b[^>]*\bmanga-item__img-inner\b[^>]*>/gi);
-          const imgTag = imgs == null ? void 0 : imgs[imgs.length - 1];
-          const cover = imgTag ? listingCover(imgTag) : "";
-          items.push((0, item_1.matureItem)({
-            id,
-            title,
-            coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : void 0,
-            webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
-          }));
-        }
-        if (items.length)
-          return items;
-        const h3Re = /<h3\b[^>]*>\s*<a\b([^>]*href=["'][^"']*\/hentai\/[^"']+["'][^>]*)>([\s\S]*?)<\/a>/gi;
-        while (match = h3Re.exec(html)) {
-          const tag = `<a ${match[1]}>`;
-          const href = (_f = (0, html_1.attr)(tag, "href")) != null ? _f : "";
-          const title = (0, html_1.stripTags)((_g = match[2]) != null ? _g : "") || (0, html_1.attr)(tag, "title") || "";
-          if (!href || !title)
-            continue;
-          const id = (0, exports.parseMangaId)(href);
-          if (!id || seen.has(id) || /\/page\/\d+/i.test(href))
-            continue;
-          seen.add(id);
-          const before = html.slice(Math.max(0, match.index - 24e3), match.index);
-          const imgs = before.match(/<img\b[^>]*(?:manga-item__img-inner|src=)[^>]*>/gi);
-          const imgTag = imgs == null ? void 0 : imgs[imgs.length - 1];
-          const cover = imgTag ? listingCover(imgTag) : "";
-          items.push((0, item_1.matureItem)({
-            id,
-            title,
-            coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : void 0,
-            webUrl: (0, http_1.absoluteUrl)(constants_1.BASE, href)
-          }));
-        }
-        return items;
-      };
-      exports.parseListing = parseListing;
-      var capitalizeEach = (value) => value.split(" ").map((word) => word ? word.charAt(0).toUpperCase() + word.slice(1) : word).join(" ");
-      var isIndexHref = (href) => /-index\/?$/i.test(href.replace(/\/+$/, ""));
-      var taxonomyNames = (html, path) => {
-        var _a, _b, _c;
-        const pattern = new RegExp(`<a\\b([^>]*href=["'][^"']*${path}[^"']*["'][^>]*)>([\\s\\S]*?)<\\/a>`, "gi");
-        const names = [];
-        const seen = /* @__PURE__ */ new Set();
-        let match;
-        while (match = pattern.exec(html)) {
-          const href = (_a = (0, html_1.attr)(`<a ${match[1]}>`, "href")) != null ? _a : "";
-          if (isIndexHref(href) || !href.includes(path))
-            continue;
-          const span = (0, html_1.firstMatch)((_b = match[2]) != null ? _b : "", /<span\b[^>]*>([\s\S]*?)<\/span>/i);
-          const name = (0, html_1.stripTags)((_c = span != null ? span : match[2]) != null ? _c : "");
-          if (!name || seen.has(name.toLowerCase()))
-            continue;
-          seen.add(name.toLowerCase());
-          names.push(name);
-        }
-        return names;
-      };
-      exports.taxonomyNames = taxonomyNames;
-      var parseLanguages = (html) => {
-        var _a;
-        const slugs = [];
-        const re = /href=["'][^"']*\/language\/([^/"']+)\/?[^"']*["']/gi;
-        let match;
-        while (match = re.exec(html)) {
-          const slug = (_a = match[1]) == null ? void 0 : _a.toLowerCase();
-          if (slug && slug !== "language-index" && !slugs.includes(slug)) {
-            slugs.push(slug);
-          }
-        }
-        return slugs;
-      };
-      exports.parseLanguages = parseLanguages;
-      var parseGalleryId = (html) => {
-        const clip = (0, html_1.firstMatch)(html, /data-clipboard-text=["']#(\d+)["']/i);
-        if (clip)
-          return clip;
-        return (0, html_1.firstMatch)(html, /#\s*(\d{3,})/);
-      };
-      exports.parseGalleryId = parseGalleryId;
-      var parseUploadedDate = (html) => {
-        var _a;
-        const raw = (0, html_1.stripTags)((_a = (0, html_1.firstMatch)(html, /Uploaded:<\/div>\s*<div\b[^>]*>([\s\S]*?)<\/div>/i)) != null ? _a : "");
-        if (!raw)
-          return void 0;
-        const date = new Date(raw);
-        return Number.isNaN(date.getTime()) ? void 0 : date;
-      };
-      exports.parseUploadedDate = parseUploadedDate;
-      var labeledValue = (html, label) => {
-        var _a, _b;
-        return (0, html_1.stripTags)((_b = (_a = (0, html_1.firstMatch)(html, new RegExp(`${label}:<\\/div>[\\s\\S]{0,400}?<span[^>]*text-gray-100[^>]*>([\\s\\S]*?)<\\/span>`, "i"))) != null ? _a : (0, html_1.firstMatch)(html, new RegExp(`${label}:<\\/div>[\\s\\S]{0,400}?>(\\d[\\d.,KMB]*)`, "i"))) != null ? _b : "");
-      };
-      var parseDetails = (html, contentId) => {
-        var _a, _b, _c, _d;
-        const url = (0, exports.contentUrl)(contentId);
-        const title = (0, html_1.stripTags)((_b = (_a = (0, html_1.firstMatch)(html, /<div[^>]*class=["'][^"']*manga-titles[^"']*["'][^>]*>[\s\S]*?<h1\b[^>]*>([\s\S]*?)<\/h1>/i)) != null ? _a : (0, html_1.firstMatch)(html, /<h1\b[^>]*>([\s\S]*?)<\/h1>/i)) != null ? _b : "") || contentId;
-        const artists = (0, exports.taxonomyNames)(html, "/artist/");
-        const circles = (0, exports.taxonomyNames)(html, "/circle/");
-        const genres = (0, exports.taxonomyNames)(html, "/tag/");
-        const categories = (0, exports.taxonomyNames)(html, "/genre/");
-        const characters = [
-          ...(0, exports.taxonomyNames)(html, "/characters/"),
-          ...(0, exports.taxonomyNames)(html, "/character/")
-        ].filter((name, index, all) => all.indexOf(name) === index);
-        const parodies = (0, exports.taxonomyNames)(html, "/parody/");
-        const conventions = (0, exports.taxonomyNames)(html, "/convention/");
-        const scanlators = (0, exports.taxonomyNames)(html, "/scanlator/");
-        const languages = (0, exports.parseLanguages)(html);
-        const galleryId = (0, exports.parseGalleryId)(html);
-        const pagesCount = labeledValue(html, "Pages");
-        const views = labeledValue(html, "Views");
-        const year = (0, exports.taxonomyNames)(html, "/release/")[0];
-        const uploaded = (0, exports.parseUploadedDate)(html);
-        const altRaw = (0, html_1.stripTags)((_c = (0, html_1.firstMatch)(html, /<div[^>]*class=["'][^"']*manga-titles[^"']*["'][^>]*>[\s\S]*?<h2\b[^>]*>([\s\S]*?)<\/h2>/i)) != null ? _c : "") || "";
-        const additionalTitles = altRaw ? altRaw.split("|").map((t) => t.trim()).filter(Boolean) : [];
-        const parts = [];
-        if (characters.length) {
-          parts.push(`Characters: ${capitalizeEach(characters.join(", "))}`);
-        }
-        if (parodies.length) {
-          parts.push(`Parodies: ${capitalizeEach(parodies.join(", "))}`);
-        }
-        if (circles.length) {
-          parts.push(`Circles: ${capitalizeEach(circles.join(", "))}`);
-        }
-        if (conventions.length) {
-          parts.push(`Convention: ${capitalizeEach(conventions.join(", "))}`);
-        }
-        if (scanlators.length) {
-          parts.push(`Scanlators: ${capitalizeEach(scanlators.join(", "))}`);
-        }
-        if (languages.length) {
-          parts.push(`Language: ${languages.map(capitalizeEach).join(", ")}`);
-        }
-        if (additionalTitles.length) {
-          parts.push(`Alternative Titles:
-${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
-        }
-        if (pagesCount)
-          parts.push(`Pages: ${pagesCount}`);
-        let cover = (0, html_1.metaContent)(html, "og:image") || (0, html_1.metaContent)(html, "twitter:image") || "";
-        if (!cover) {
-          const img = (_d = (0, html_1.firstMatch)(html, /(<img\b[^>]*fetchpriority=["']high["'][^>]*>)/i)) != null ? _d : (0, html_1.firstMatch)(html, /(<img\b[^>]*class=["'][^"']*manga-item__img-inner[^>]*>)/i);
-          if (img)
-            cover = listingCover(img);
-        }
-        const author = circles.join(", ") || artists.join(", ") || void 0;
-        const artist = artists.join(", ") || circles.join(", ") || void 0;
-        const additionalDetails = {
-          ...galleryId ? { Gallery: galleryId } : {},
-          ...categories.length ? { Category: categories.join(", ") } : {},
-          ...year ? { Year: year } : {},
-          ...pagesCount ? { Pages: pagesCount } : {},
-          ...views ? { Views: views } : {}
-        };
-        const credits = [
-          ...author ? [{ name: author, role: "Author" }] : [],
-          ...artist && artist !== author ? [{ name: artist, role: "Artist" }] : []
-        ];
-        return {
-          title,
-          coverImage: cover ? (0, http_1.absoluteUrl)(constants_1.BASE, cover) : "",
-          webUrl: url,
-          rating: types_1.ContentRating.MATURE,
-          status: types_1.ContentStatus.COMPLETED,
-          summary: parts.join("\n\n") || void 0,
-          additionalTitles: additionalTitles.length ? additionalTitles : void 0,
-          additionalDetails: Object.keys(additionalDetails).length ? additionalDetails : void 0,
-          genres: genres.length ? genres.map((g) => ({
-            id: g.toLowerCase().replace(/\s+/g, "-"),
-            title: g
-          })) : void 0,
-          ...characters.length ? { characters: characters.map((name) => ({ name })) } : {},
-          ...credits.length ? { credits } : {},
-          context: {
-            ...scanlators.length ? { scanlator: scanlators.join(", ") } : {},
-            ...languages.length ? { languages } : {},
-            ...galleryId ? { galleryId } : {},
-            ...pagesCount ? { pageCount: pagesCount } : {},
-            ...uploaded ? { uploaded: uploaded.toISOString() } : {}
-          }
-        };
-      };
-      exports.parseDetails = parseDetails;
-      var parsePageRange = (query, minPages = 1, maxPages = 9999) => {
-        const num = Number.parseInt(query.replace(/\D/g, ""), 10);
-        const limited = (n = num) => Math.min(maxPages, Math.max(minPages, n));
-        if (Number.isNaN(num) || num < 0)
-          return [minPages, maxPages];
-        switch (query[0]) {
-          case "<":
-            return query[1] === "=" ? [minPages, limited()] : [minPages, limited(Math.max(minPages, num - 1))];
-          case ">":
-            return [limited(query[1] === "=" ? num : num + 1), maxPages];
-          case "=":
-            if (query[1] === ">")
-              return [limited(), maxPages];
-            if (query[1] === "<")
-              return [minPages, limited()];
-            return [limited(), limited()];
-          default:
-            return [limited(), limited()];
-        }
-      };
-      exports.parsePageRange = parsePageRange;
-      var parsePageBaseUrl = (html) => {
-        var _a, _b, _c;
-        const extra = (_a = (0, html_1.firstMatch)(html, /<script\b[^>]*id=["']single-chapter-js-extra["'][^>]*>([\s\S]*?)<\/script>/i)) != null ? _a : html;
-        return (_c = (_b = (0, html_1.firstMatch)(extra, /"baseUrl"\s*:\s*"([^"]+)"/)) != null ? _b : (0, html_1.firstMatch)(extra, /'baseUrl'\s*:\s*'([^']+)'/)) != null ? _c : "";
-      };
-      var imagesFromDto = (dto, pageBaseUrl) => {
-        var _a, _b, _c;
-        const images = (_c = (_b = (_a = dto.data) == null ? void 0 : _a.chapter) == null ? void 0 : _b.images) != null ? _c : [];
-        return images.map((image) => {
-          var _a2;
-          return ((_a2 = image.src) != null ? _a2 : "").trim();
-        }).filter(Boolean).map((src) => {
-          if (/^https?:\/\//i.test(src) || src.startsWith("//")) {
-            return (0, http_1.absoluteUrl)(constants_1.BASE, src);
-          }
-          if (!pageBaseUrl)
-            return "";
-          return `${pageBaseUrl.replace(/\/+$/, "")}/${src.replace(/^\/+/, "")}`;
-        }).filter(Boolean);
-      };
-      var dtoFromBase64 = (blob) => {
-        var _a, _b, _c;
-        try {
-          const parsed = JSON.parse((0, html_1.base64Decode)(blob));
-          if ((_c = (_b = (_a = parsed == null ? void 0 : parsed.data) == null ? void 0 : _a.chapter) == null ? void 0 : _b.images) == null ? void 0 : _c.length)
-            return parsed;
-        } catch {
-          return void 0;
-        }
-        return void 0;
-      };
-      var parseChapterPages = (html) => {
-        var _a, _b, _c, _d, _e;
-        const pageBaseUrl = parsePageBaseUrl(html);
-        const before = (_a = (0, html_1.firstMatch)(html, /<script\b[^>]*id=["']single-chapter-js-before["'][^>]*>([\s\S]*?)<\/script>/i)) != null ? _a : "";
-        const blobs = [
-          .../* @__PURE__ */ new Set([
-            ...(_b = before.match(BASE64_JSON)) != null ? _b : [],
-            ...(_c = html.match(BASE64_JSON)) != null ? _c : []
-          ])
-        ];
-        for (const blob of blobs) {
-          const dto = dtoFromBase64(blob);
-          if (!dto)
-            continue;
-          const urls2 = imagesFromDto(dto, pageBaseUrl);
-          if (urls2.length)
-            return urls2.map((url) => ({ url }));
-        }
-        const urls = [];
-        const imgRe = /<img\b[^>]*(?:wp-manga-chapter-img|reading-content)[^>]*>|<img\b[^>]*>/gi;
-        let img;
-        const reading = (_d = (0, html_1.firstMatch)(html, /<div\b[^>]*class=["'][^"']*reading-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)) != null ? _d : html;
-        while (img = imgRe.exec(reading)) {
-          const src = (0, html_1.imageFromTag)((_e = img[0]) != null ? _e : "");
-          if (isUsableImage(src) && !/hencover\.xyz/i.test(src)) {
-            urls.push((0, http_1.absoluteUrl)(constants_1.BASE, src));
-          }
-        }
-        return [...new Set(urls)].map((url) => ({ url }));
-      };
-      exports.parseChapterPages = parseChapterPages;
-      var readerLanguageOrder = (html) => {
-        const listed = (0, exports.parseLanguages)(html);
-        const order = [
-          ...listed.filter((lang) => lang === "english"),
-          "english",
-          ...listed.filter((lang) => lang !== "english"),
-          ""
-        ];
-        return order.filter((lang, index) => order.indexOf(lang) === index);
-      };
-      exports.readerLanguageOrder = readerLanguageOrder;
-    }
-  });
-
-  // __temp__/sources/hentairead/index.js
-  var require_hentairead = __commonJS({
-    "__temp__/sources/hentairead/index.js"(exports) {
+  // __temp__/sources/doujins/index.js
+  var require_doujins = __commonJS({
+    "__temp__/sources/doujins/index.js"(exports) {
       "use strict";
       "use httpclient";
       init_Buffer();
       init_process();
       Object.defineProperty(exports, "__esModule", { value: true });
       var types_1 = require_types();
-      var types_2 = require_types();
-      var client_1 = require_client2();
-      var cloudflare_1 = require_cloudflare();
-      var http_1 = require_http2();
-      var constants_1 = require_constants();
-      var parse_1 = require_parse4();
-      var TAXONOMY = {
-        artist: "manga_artist",
-        manga_tag: "manga_tag"
-      };
-      var isImageRequest = (url) => /hencover\.|henread\.|\/wp-content\/uploads\//i.test(url) || /\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(url);
-      var isCloudflareError = (error) => {
-        var _a, _b;
-        const name = String((_a = error == null ? void 0 : error.name) != null ? _a : "");
-        const message = String((_b = error == null ? void 0 : error.message) != null ? _b : error);
-        return name.includes("Cloudflare") || message.includes("Cloudflare") || message.includes("cloudflare");
-      };
-      var cloudflareFromThrown = (error) => {
-        var _a;
-        if (isCloudflareError(error))
-          return true;
-        const response = error.response;
-        if (!response)
-          return false;
-        return (0, cloudflare_1.cloudflareFromHeaders)((_a = response.status) != null ? _a : 0, response.headers);
-      };
-      var Target = class {
+      var shared_1 = require_shared();
+      var BASE = "https://doujins.com";
+      var contentPath = (id) => `/${id.replace(/^\/+|\/+$/g, "")}/`;
+      var Doujins = class {
         constructor() {
-          __publicField(this, "client", (() => {
-            const http = (0, client_1.createProtectedClient)(constants_1.CF_RESOLVE, { Referer: `${constants_1.BASE}/` });
-            http.interceptors.request.use((request) => {
-              if (isImageRequest(request.url)) {
-                request.headers.set("Accept", constants_1.IMAGE_ACCEPT);
-                request.headers.set("Referer", `${constants_1.BASE}/`);
-              }
-              return request;
-            });
-            return http;
-          })());
-          __publicField(this, "getConfiguration", () => ({
-            imageReferer: `${constants_1.BASE}/`,
-            cloudflareResolutionURL: constants_1.CF_RESOLVE,
-            useClientForImageRequests: true
+          __publicField(this, "client", new HttpClient({
+            baseUrl: BASE,
+            cloudflareResolutionURL: `${BASE}/`,
+            headers: { Referer: `${BASE}/` },
+            rateLimit: { permits: 2, period: 1 }
           }));
-          __publicField(this, "getSettingsPage", async () => ({
-            sections: [
-              {
-                header: "Cloudflare",
-                footer: "Complete the website check, then refresh the source. If the check repeats, open the challenge page here.",
-                views: [
-                  (0, types_1.UIWebViewButton)({
-                    title: "Open Challenge Page",
-                    url: { url: constants_1.CF_RESOLVE }
-                  })
-                ]
-              }
-            ]
-          }));
-          __publicField(this, "willRequestImage", async (request) => {
-            var _a;
+          __publicField(this, "getHomePage", async () => ({ feeds: [
+            { id: "popular", title: "Popular", content: { list: { key: "popular" } } },
+            { id: "latest", title: "Latest", content: { list: { key: "latest" } } }
+          ] }));
+        }
+        getConfiguration() {
+          return { imageReferer: `${BASE}/`, cloudflareResolutionURL: `${BASE}/`, useClientForImageRequests: true };
+        }
+        async get(path) {
+          const response = await this.client.get(path);
+          (0, shared_1.assertOk)(response.status, (0, shared_1.absolute)(path, BASE));
+          return (0, shared_1.checkedHtml)(await response.text(), `${BASE}/`);
+        }
+        async listing(path) {
+          var _a, _b, _c, _d, _e;
+          const root = (0, shared_1.document)(await this.get(path));
+          const items = [];
+          const seen = /* @__PURE__ */ new Set();
+          for (const link of root.querySelectorAll(".thumbnail-doujin a.gallery-visited-from-favorites")) {
+            if ((_b = (_a = link.parentNode) == null ? void 0 : _a.classNames) == null ? void 0 : _b.includes("premium-folder"))
+              continue;
+            const url = (0, shared_1.href)(link, BASE);
+            if (!url)
+              continue;
+            const id = (0, shared_1.idFrom)(url, BASE);
+            const title = (0, shared_1.text)(link.querySelector("div.title .text")) || ((_c = link.getAttribute("title")) == null ? void 0 : _c.trim()) || ((_e = (_d = link.querySelector("img")) == null ? void 0 : _d.getAttribute("alt")) == null ? void 0 : _e.trim()) || "";
+            if (!title || seen.has(id))
+              continue;
+            seen.add(id);
+            items.push({ id, title, coverImage: (0, shared_1.image)(link.querySelector("img"), BASE), webUrl: url, rating: types_1.ContentRating.MATURE });
+          }
+          return { items, isLastPage: !root.querySelector(".pagination li.page-item:last-child:not(.disabled), .pagination a[rel=next]") };
+        }
+        async getItemList(request, page) {
+          var _a;
+          if (request.key !== "latest")
+            return this.listing(`/top/month${page > 1 ? `?page=${page}` : ""}`);
+          const end = Math.floor(Date.now() / 1e3) + 86400 - 3 * 86400 * (Math.max(1, page) - 1);
+          const start = end - 3 * 86400;
+          const data = JSON.parse(await this.get(`/folders?start=${start}&end=${end}`));
+          const items = ((_a = data.folders) != null ? _a : []).map((folder) => {
+            const url = (0, shared_1.absolute)(folder.link, BASE);
             return {
-              ...request,
-              headers: {
-                ...(_a = request.headers) != null ? _a : {},
-                Accept: constants_1.IMAGE_ACCEPT,
-                Referer: `${constants_1.BASE}/`
-              }
+              id: (0, shared_1.idFrom)(url, BASE),
+              title: folder.name,
+              coverImage: (0, shared_1.absolute)(folder.thumbnail2, BASE),
+              webUrl: url,
+              rating: types_1.ContentRating.MATURE
             };
           });
-          __publicField(this, "getHtml", async (url, referer = `${constants_1.BASE}/`, extraHeaders = {}) => {
-            var _a, _b, _c;
-            try {
-              const response = await this.client.get(url, {
-                headers: { Referer: referer, ...extraHeaders }
-              });
-              if ((0, cloudflare_1.cloudflareFromHeaders)(response.status, response.headers)) {
-                (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-              }
-              const body = await response.text();
-              if ((0, cloudflare_1.looksLikeCloudflare)(body))
-                (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-              if (!response.ok) {
-                throw new Error(`GET ${url} failed (${response.status})`);
-              }
-              return body;
-            } catch (error) {
-              if (cloudflareFromThrown(error))
-                (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-              const response = error.response;
-              if (response) {
-                const body = (_b = await ((_a = response.text) == null ? void 0 : _a.call(response).catch(() => ""))) != null ? _b : "";
-                if ((0, cloudflare_1.looksLikeCloudflare)(body) || (0, cloudflare_1.cloudflareFromHeaders)((_c = response.status) != null ? _c : 0, response.headers)) {
-                  (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-                }
-              }
-              throw error;
-            }
-          });
-          __publicField(this, "failEmptyListing", (html) => {
-            var _a, _b, _c;
-            if ((0, cloudflare_1.looksLikeCloudflare)(html))
-              (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-            const title = (_c = (_b = (_a = html.match(/<title>([\s\S]*?)<\/title>/i)) == null ? void 0 : _a[1]) == null ? void 0 : _b.replace(/\s+/g, " ").trim()) != null ? _c : "";
-            throw new Error(`HentaiRead listing parsed 0 titles (${html.length} bytes${title ? `, ${title.slice(0, 80)}` : ""}). Clear Network Cache, Open Challenge Page, retry.`);
-          });
-          __publicField(this, "getHomePage", async () => {
-            return {
-              feeds: [
-                {
-                  id: "latest",
-                  title: "Latest",
-                  content: { list: { key: "latest", disableSorting: true } }
-                },
-                {
-                  id: "popular",
-                  title: "Popular",
-                  content: { list: { key: "popular", disableSorting: true } }
-                }
-              ]
-            };
-          });
-          __publicField(this, "getSortOptions", async () => ({
-            options: [...constants_1.SORTS],
-            disableOrdering: false
-          }));
-          __publicField(this, "getSearchFilters", async () => [
-            (0, types_1.SearchFilter)("types", "Types", (0, types_1.SelectFilter)(constants_1.TYPES.map((type) => ({ id: type.id, title: type.title })), false)),
-            ...constants_1.TEXT_FILTERS.map((filter) => (0, types_1.SearchFilter)(filter.id, filter.name, (0, types_1.TextFilter)(), filter.hint)),
-            (0, types_1.SearchFilter)("uploaded", "Uploaded", (0, types_1.TextFilter)(), "Year filter, e.g. >2024"),
-            (0, types_1.SearchFilter)("pages", "Pages", (0, types_1.TextFilter)(), "Page count filter, e.g. >20")
-          ]);
-          __publicField(this, "getItemList", async (request, page) => {
-            const sortby = request.key === "popular" ? "views" : "new";
-            const html = await this.getHtml((0, parse_1.listingUrl)(page, sortby));
-            const items = (0, parse_1.parseListing)(html);
-            if (!items.length)
-              this.failEmptyListing(html);
-            return { items, isLastPage: !(0, parse_1.hasNextPage)(html) };
-          });
-          __publicField(this, "getSearchResults", async (request, page) => {
-            var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
-            const filters = (_a = request.filters) != null ? _a : {};
-            const pairs = [
-              ["s", (_c = (_b = request.query) == null ? void 0 : _b.trim()) != null ? _c : ""],
-              ["title-type", "contains"],
-              ["sortby", (_e = (_d = request.sort) == null ? void 0 : _d.key) != null ? _e : "new"],
-              ["order", ((_f = request.sort) == null ? void 0 : _f.ascending) ? "asc" : "desc"]
-            ];
-            const types = filters.types;
-            for (const value of (_g = types == null ? void 0 : types.include) != null ? _g : []) {
-              pairs.push(["categories[]", value]);
-            }
-            for (const filter of constants_1.TEXT_FILTERS) {
-              const raw = (_h = filters[filter.id]) == null ? void 0 : _h.trim();
-              if (!raw)
-                continue;
-              for (const part of raw.split(",").map((s) => s.trim()).filter(Boolean)) {
-                const exclude = part.startsWith("-");
-                const name = exclude ? part.slice(1).trim() : part;
-                const id = await this.getTagId(name, filter.type);
-                if (id == null) {
-                  throw new Error(`${filter.name.replace(/s$/, "")} not found: ${name}`);
-                }
-                if (filter.type === "manga_tag") {
-                  pairs.push([exclude ? "excluding[]" : "including[]", String(id)]);
-                } else {
-                  pairs.push([`${filter.type}s[]`, String(id)]);
-                }
-              }
-            }
-            const uploaded = (_i = filters.uploaded) == null ? void 0 : _i.trim();
-            if (uploaded) {
-              const kind = uploaded[0] === ">" ? "after" : uploaded[0] === "<" ? "before" : "in";
-              pairs.push(["release-type", kind]);
-              pairs.push(["release", uploaded.replace(/\D/g, "")]);
-            }
-            const pages = (_j = filters.pages) == null ? void 0 : _j.trim();
-            if (pages) {
-              const [min, max] = (0, parse_1.parsePageRange)(pages);
-              pairs.push(["pages", `${min}-${max}`]);
-            }
-            const html = await this.getHtml((0, parse_1.searchUrl)(page, pairs));
-            const items = (0, parse_1.parseListing)(html);
-            return { items, isLastPage: !(0, parse_1.hasNextPage)(html) || items.length === 0 };
-          });
-          __publicField(this, "getContent", async (contentId) => {
-            const html = await this.getHtml((0, parse_1.contentUrl)(contentId));
-            return (0, parse_1.parseDetails)(html, contentId);
-          });
-          __publicField(this, "getChapters", async (contentId) => {
+          return { items, isLastPage: items.length === 0 };
+        }
+        getSearchResults(request, page) {
+          var _a;
+          const query = (_a = request.query) == null ? void 0 : _a.trim();
+          return query ? this.listing(`/searches?words=${encodeURIComponent(query)}&page=${page}&sort=`) : this.getItemList({ key: "popular" }, page);
+        }
+        async getContent(contentId) {
+          var _a, _b, _c, _d;
+          const url = (0, shared_1.absolute)(contentPath(contentId), BASE);
+          const root = (0, shared_1.document)(await this.get(url));
+          const headings = root.querySelectorAll(".folder-title a");
+          const title = (0, shared_1.text)(headings[headings.length - 1]) || (0, shared_1.text)(root.querySelector("h1")) || contentId;
+          const names = root.querySelectorAll(".gallery-artist a").map((n) => (0, shared_1.text)(n)).filter(Boolean);
+          const tags = root.querySelectorAll(".tag-area a").map((n) => (0, shared_1.text)(n)).filter(Boolean);
+          return {
+            title,
+            coverImage: (0, shared_1.image)(root.querySelector(".thumbnail-doujin img, .folder-cover img, img.cover"), BASE) || (0, shared_1.absolute)((_b = (_a = root.querySelector("meta[property='og:image']")) == null ? void 0 : _a.getAttribute("content")) != null ? _b : void 0, BASE) || (0, shared_1.absolute)((_d = (_c = root.querySelector(".doujin[data-file]")) == null ? void 0 : _c.getAttribute("data-file")) != null ? _d : void 0, BASE),
+            summary: tags.length ? `Tags: ${tags.join(", ")}` : "",
+            webUrl: url,
+            contentType: types_1.ContentType.MANGA,
+            readingMode: types_1.ReadingMode.PAGED_MANGA,
+            status: types_1.ContentStatus.COMPLETED,
+            rating: types_1.ContentRating.MATURE,
+            ...names.length ? { credits: names.map((name) => ({ name, role: "Artist" })) } : {},
+            ...tags.length ? { genres: tags.map((tag) => ({ id: tag, title: tag })) } : {}
+          };
+        }
+        async getChapters(contentId) {
+          return [{
+            id: contentId,
+            index: 0,
+            number: 1,
+            title: "Complete gallery",
+            language: "en",
+            webUrl: (0, shared_1.absolute)(contentPath(contentId), BASE)
+          }];
+        }
+        async getChapterPages(_contentId, chapterId) {
+          const root = (0, shared_1.document)(await this.get(contentPath(chapterId)));
+          const urls = root.querySelectorAll(".doujin[data-file]").map((node) => {
             var _a, _b;
-            const content = await this.getContent(contentId);
-            const scanlator = (_a = content.context) == null ? void 0 : _a.scanlator;
-            const uploaded = (_b = content.context) == null ? void 0 : _b.uploaded;
-            const date = uploaded ? new Date(uploaded) : /* @__PURE__ */ new Date();
-            return [
-              {
-                id: contentId,
-                index: 0,
-                number: 1,
-                title: scanlator || "Chapter",
-                language: "en",
-                date: Number.isNaN(date.getTime()) ? /* @__PURE__ */ new Date() : date,
-                webUrl: (0, parse_1.readerUrl)(contentId)
-              }
-            ];
-          });
-          __publicField(this, "getChapterPages", async (contentId, _chapterId) => {
-            const detailsHtml = await this.getHtml((0, parse_1.contentUrl)(contentId));
-            const order = (0, parse_1.readerLanguageOrder)(detailsHtml);
-            let lastError;
-            for (const language of order) {
-              try {
-                const html = await this.getHtml((0, parse_1.readerUrl)(contentId, language), (0, parse_1.contentUrl)(contentId));
-                const pages = (0, parse_1.parseChapterPages)(html);
-                if (pages.length)
-                  return pages;
-              } catch (error) {
-                if (cloudflareFromThrown(error))
-                  (0, cloudflare_1.throwCloudflare)(constants_1.CF_RESOLVE);
-                lastError = error;
-              }
-            }
-            throw lastError != null ? lastError : new Error("Failed to find page list. Reader scripts were missing.");
-          });
-          __publicField(this, "getTagId", async (tag, type) => {
-            var _a, _b;
-            const taxonomy = (_a = TAXONOMY[type]) != null ? _a : type;
-            const url = (0, http_1.withQuery)(`${constants_1.BASE}/wp-admin/admin-ajax.php`, {
-              action: "search_manga_terms",
-              search: tag,
-              taxonomy
-            });
-            const html = await this.getHtml(url, `${constants_1.BASE}/`, {
-              "X-Requested-With": "XMLHttpRequest",
-              Accept: "application/json, text/javascript, */*;q=0.1"
-            });
-            let data;
-            try {
-              data = JSON.parse(html);
-            } catch {
-              return void 0;
-            }
-            const hit = (_b = data.results) == null ? void 0 : _b.find((item) => item.text.toLowerCase() === tag.toLowerCase());
-            return hit == null ? void 0 : hit.id;
-          });
+            return (0, shared_1.absolute)((_b = (_a = node.getAttribute("data-file")) == null ? void 0 : _a.replace(/&amp;|amp;/g, "&")) != null ? _b : void 0, BASE);
+          }).filter(Boolean);
+          if (!urls.length)
+            throw new Error("Doujins returned no reader images");
+          return urls.map((url) => ({ url }));
         }
       };
-      __publicField(Target, "info", {
-        id: "en.hentairead",
-        name: "HentaiRead",
-        version: 6,
-        website: constants_1.BASE,
-        thumbnail: "hentairead.png",
+      __publicField(Doujins, "info", {
+        id: "en.doujins",
+        name: "Doujins",
+        version: 1,
+        thumbnail: "doujins.png",
+        website: BASE,
         languages: ["en"],
-        rating: types_2.ContentRating.MATURE
+        rating: types_1.ContentRating.MATURE,
+        minSupportedAppVersion: "7.0.0"
       });
-      exports.default = Target;
+      exports.default = Doujins;
     }
   });
 
-  // __temp__/wrappers/hentairead.js
-  var require_hentairead2 = __commonJS({
-    "__temp__/wrappers/hentairead.js"(exports) {
+  // __temp__/wrappers/doujins.js
+  var require_doujins2 = __commonJS({
+    "__temp__/wrappers/doujins.js"(exports) {
       init_Buffer();
       init_process();
       var runtime = require_runtime();
-      var sourceModule = require_hentairead();
+      var sourceModule = require_doujins();
       var cls = runtime.resolveDefaultExport(sourceModule);
-      exports.SourceMetadata = { "id": "en.hentairead", "name": "HentaiRead", "version": 6, "website": "https://hentairead.com", "thumbnail": "hentairead.png", "languages": ["en"], "rating": 2 };
+      exports.SourceMetadata = { "id": "en.doujins", "name": "Doujins", "version": 1, "thumbnail": "doujins.png", "website": "https://doujins.com", "languages": ["en"], "rating": 2, "minSupportedAppVersion": "7.0.0" };
       exports.SourceConfiguration = null;
       exports.bootstrap = function bootstrap() {
         var args = null;
@@ -8367,7 +7225,7 @@ ${additionalTitles.map((t) => `- ${t}`).join("\n")}`);
       };
     }
   });
-  return require_hentairead2();
+  return require_doujins2();
 })();
 /*! Bundled license information:
 

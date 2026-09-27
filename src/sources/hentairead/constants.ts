@@ -1,8 +1,9 @@
 export const BASE = "https://hentairead.com";
 export const MANGA = "hentai";
 
-/** Nested listing — WKWebView often blanks on `/`. Keiyoushi latest URL. */
-export const CF_RESOLVE = `${BASE}/hentai/?sortby=new`;
+// Resolve on the same site origin used by the Aidoku extension. The native
+// client then requests the actual listing with the established session.
+export const CF_RESOLVE = `${BASE}/`;
 
 export const IMAGE_ACCEPT =
   "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";

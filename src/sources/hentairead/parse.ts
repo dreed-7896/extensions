@@ -12,6 +12,7 @@ import {
 import { absoluteUrl } from "../_shared/http";
 import { matureItem } from "../_shared/item";
 import { BASE, MANGA } from "./constants";
+import { document, text } from "../../shared";
 
 type PagesDto = {
   data?: { chapter?: { images?: Array<{ src?: string }> } };
@@ -107,6 +108,27 @@ const itemFromCard = (card: string) => {
 export const parseListing = (html: string) => {
   const items: ReturnType<typeof matureItem>[] = [];
   const seen = new Set<string>();
+
+  // Match the Aidoku extension: its listing titles live in h3 links, often
+  // in the title attribute. Ignore genre links that appear before the h3.
+  for (const card of document(html).querySelectorAll("div.manga-item")) {
+    const link = card.querySelector("h3 a[href*='/hentai/']");
+    const href = link?.getAttribute("href") ?? "";
+    if (!href || /\/page\/\d+/i.test(href)) continue;
+    const id = parseMangaId(href);
+    if (!id || seen.has(id)) continue;
+    const cover = card.querySelector("img.manga-item__img-inner, img");
+    const title = link?.getAttribute("title")?.trim() || text(link)
+      || cover?.getAttribute("alt")?.trim() || id.replace(/[-_]+/g, " ");
+    const coverUrl = cover ? listingCover(cover.outerHTML) : "";
+    seen.add(id);
+    items.push(matureItem({
+      id, title,
+      coverImage: coverUrl ? absoluteUrl(BASE, coverUrl) : undefined,
+      webUrl: absoluteUrl(BASE, href),
+    }));
+  }
+  if (items.length) return items;
 
   const cards = collectBlocks(html, CARD_OPEN, "div");
   const chunks = cards.length
