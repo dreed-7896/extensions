@@ -118,51 +118,74 @@ impl HentaiRead {
 		Ok(MangaPageResult { entries, has_next_page })
 	}
 
-	fn search_collections(query: Option<String>, page: i32) -> Result<MangaPageResult> {
-		if page > 1 {
-			return Ok(MangaPageResult { entries: Vec::new(), has_next_page: false });
-		}
-		let query = query.unwrap_or_default().trim().to_ascii_lowercase();
-		let mut entries: Vec<Manga> = Vec::new();
-		let mut saw_collections = false;
+	fn search_collection_terms(query: &str, page: i32) -> Result<MangaPageResult> {
+		let mut params = QueryParameters::new();
+		params.push("action", Some("search_manga_terms"));
+		params.push("search", Some(query));
+		params.push("taxonomy", Some("collection"));
+		params.push("page", Some(&page.max(1).to_string()));
+		let body = Request::get(format!("{BASE_URL}/wp-admin/admin-ajax.php?{params}"))?.string()?;
+		let value: Value = serde_json::from_str(&body)
+			.map_err(|_| aidoku::AidokuError::message("Invalid collection search response"))?;
+		let entries = value.get("results").and_then(Value::as_array)
+			.ok_or_else(|| aidoku::AidokuError::message("Missing collection search results"))?
+			.iter()
+			.filter_map(|item| {
+				let id = item.get("id")?;
+				let id = id.as_i64().map(|id| id.to_string())
+					.or_else(|| id.as_str().map(ToOwned::to_owned))?;
+				let title = item.get("text")?.as_str()?.trim();
+				if title.is_empty() { return None; }
+				Some(Manga {
+					key: format!("/collection/__term__/{id}/"),
+					title: title.into(),
+					content_rating: ContentRating::NSFW,
+					..Default::default()
+				})
+			})
+			.collect();
+		let has_next_page = value.pointer("/pagination/more")
+			.and_then(Value::as_bool).unwrap_or(false);
+		Ok(MangaPageResult { entries, has_next_page })
+	}
+
+	fn collection_url(key: &str, title: &str) -> Result<String> {
+		let Some(id) = key.strip_prefix("/collection/__term__/")
+			.map(|value| value.trim_end_matches('/'))
+		else {
+			return Ok(Self::absolute_url(key));
+		};
 		let mut visited = Vec::new();
 		let mut next = Some(format!("{BASE_URL}/collection-index/?type=a-z"));
 		while let Some(url) = next {
-			if visited.iter().any(|previous| previous == &url) {
-				break;
-			}
+			if visited.iter().any(|previous| previous == &url) { break; }
 			visited.push(url.clone());
 			let document = Request::get(&url)?.html()?;
 			if let Some(links) = document.select("a[href*='/collection/']") {
 				for link in links {
 					let Some(href) = link.attr("abs:href").or_else(|| link.attr("href")) else { continue };
 					let url = Self::absolute_url(&href);
-					let Some(key) = url.strip_prefix(BASE_URL) else { continue };
-					if !key.starts_with("/collection/") || key.trim_end_matches('/') == "/collection" {
-						continue;
-					}
-					saw_collections = true;
-					let title = link.text().unwrap_or_default().trim().to_owned();
-					if title.is_empty() || !title.to_ascii_lowercase().contains(&query)
-						|| entries.iter().any(|entry| entry.key == key)
-					{
-						continue;
-					}
-					entries.push(Manga {
-						key: key.into(),
-						title,
-						content_rating: ContentRating::NSFW,
-						..Default::default()
-					});
+					if !url.starts_with(&format!("{BASE_URL}/collection/")) { continue; }
+					let name = link.text().unwrap_or_default();
+					let name = name.trim();
+					let title_matches = name.eq_ignore_ascii_case(title)
+						|| name.strip_prefix(title).map(|suffix| suffix.trim().starts_with('(')).unwrap_or(false);
+					let id_matches = link.attr("data-term-id").or_else(|| link.attr("data-id"))
+						.map(|value| value == id).unwrap_or(false);
+					if id_matches || title_matches { return Ok(url); }
 				}
 			}
 			next = Self::next_page_url(&document)
 				.filter(|url| url.starts_with(&format!("{BASE_URL}/collection-index/")));
 		}
-		if !saw_collections {
-			bail!("HentaiRead returned no collections. If a Cloudflare challenge is visible, complete it and retry.");
+		bail!("Collection not found in the index: {title}")
+	}
+
+	fn search_collections(query: Option<String>, page: i32) -> Result<MangaPageResult> {
+		match query.as_deref().map(str::trim).filter(|query| !query.is_empty()) {
+			Some(query) => Self::search_collection_terms(query, page),
+			None => Ok(MangaPageResult { entries: Vec::new(), has_next_page: false }),
 		}
-		Ok(MangaPageResult { entries, has_next_page: false })
 	}
 
 	fn collection_entries(url: &str) -> Result<Vec<Manga>> {
@@ -486,8 +509,12 @@ impl Source for HentaiRead {
 		_needs_details: bool,
 		needs_chapters: bool,
 	) -> Result<Manga> {
-		let url = Self::absolute_url(&manga.key);
 		let is_collection = manga.key.starts_with("/collection/");
+		let url = if is_collection {
+			Self::collection_url(&manga.key, &manga.title)?
+		} else {
+			Self::absolute_url(&manga.key)
+		};
 		let collection_entries = if is_collection { Some(Self::collection_entries(&url)?) } else { None };
 		let collection_title = manga.title.clone();
 		let details_url = collection_entries
