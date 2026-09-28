@@ -1,10 +1,29 @@
 [
 	{
+		"type": "select",
+		"id": "search_type",
+		"title": "Search for",
+		"options": [
+			"Entries",
+			"Collections"
+		],
+		"ids": [
+			"entry",
+			"collection"
+		],
+		"default": "entry"
+	},
+	{
 		"type": "sort",
 		"id": "sort",
 		"title": "Sort",
 		"canAscend": true,
-		"options": ["Latest", "A-Z", "Rating", "Views"],
+		"options": [
+			"Latest",
+			"A-Z",
+			"Rating",
+			"Views"
+		],
 		"default": {
 			"index": 0,
 			"ascending": false
@@ -14,9 +33,24 @@
 		"type": "multi-select",
 		"id": "types",
 		"title": "Types",
-		"options": ["Doujinshi", "Manga", "Artist CG", "Western"],
-		"ids": ["4", "52", "4798", "36278"],
-		"defaultIncluded": ["4", "52", "4798", "36278"]
+		"options": [
+			"Doujinshi",
+			"Manga",
+			"Artist CG",
+			"Western"
+		],
+		"ids": [
+			"4",
+			"52",
+			"4798",
+			"36278"
+		],
+		"defaultIncluded": [
+			"4",
+			"52",
+			"4798",
+			"36278"
+		]
 	},
 	{
 		"type": "note",

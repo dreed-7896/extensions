@@ -2,10 +2,12 @@
 	"info": {
 		"id": "en.hentairead",
 		"name": "HentaiRead",
-		"version": 6,
+		"version": 7,
 		"url": "https://hentairead.com",
 		"contentRating": 2,
-		"languages": ["en"],
+		"languages": [
+			"en"
+		],
 		"minAppVersion": "0.7"
 	},
 	"listings": [

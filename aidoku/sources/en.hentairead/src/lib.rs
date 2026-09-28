@@ -65,8 +65,8 @@ impl HentaiRead {
 			|| value.contains("avatar")
 	}
 
-	fn parse_list(document: &aidoku::imports::html::Document) -> Result<MangaPageResult> {
-		let entries: Vec<Manga> = document
+	fn manga_items(document: &aidoku::imports::html::Document) -> Vec<Manga> {
+		document
 			.select("div.manga-item")
 			.map(|elements| {
 				elements
@@ -99,14 +99,95 @@ impl HentaiRead {
 					})
 					.collect()
 			})
-			.unwrap_or_default();
-		let has_next_page = document
-			.select_first("a[rel=next], div.nav-previous, a.nextpostslink")
-			.is_some();
+			.unwrap_or_default()
+	}
+
+	fn next_page_url(document: &aidoku::imports::html::Document) -> Option<String> {
+		document
+			.select_first("a[rel=next][href], .pagination a.next[href], a.nextpostslink[href], .nav-previous a[href]")
+			.and_then(|link| link.attr("abs:href").or_else(|| link.attr("href")))
+			.map(|href| Self::absolute_url(&href))
+	}
+
+	fn parse_list(document: &aidoku::imports::html::Document) -> Result<MangaPageResult> {
+		let entries = Self::manga_items(document);
+		let has_next_page = Self::next_page_url(document).is_some();
 		if entries.is_empty() {
 			bail!("HentaiRead returned no titles. If a Cloudflare challenge is visible, complete it and retry.");
 		}
 		Ok(MangaPageResult { entries, has_next_page })
+	}
+
+	fn search_collections(query: Option<String>, page: i32) -> Result<MangaPageResult> {
+		if page > 1 {
+			return Ok(MangaPageResult { entries: Vec::new(), has_next_page: false });
+		}
+		let query = query.unwrap_or_default().trim().to_ascii_lowercase();
+		let mut entries: Vec<Manga> = Vec::new();
+		let mut saw_collections = false;
+		let mut visited = Vec::new();
+		let mut next = Some(format!("{BASE_URL}/collection-index/?type=a-z"));
+		while let Some(url) = next {
+			if visited.iter().any(|previous| previous == &url) {
+				break;
+			}
+			visited.push(url.clone());
+			let document = Request::get(&url)?.html()?;
+			if let Some(links) = document.select("a[href*='/collection/']") {
+				for link in links {
+					let Some(href) = link.attr("abs:href").or_else(|| link.attr("href")) else { continue };
+					let url = Self::absolute_url(&href);
+					let Some(key) = url.strip_prefix(BASE_URL) else { continue };
+					if !key.starts_with("/collection/") || key.trim_end_matches('/') == "/collection" {
+						continue;
+					}
+					saw_collections = true;
+					let title = link.text().unwrap_or_default().trim().to_owned();
+					if title.is_empty() || !title.to_ascii_lowercase().contains(&query)
+						|| entries.iter().any(|entry| entry.key == key)
+					{
+						continue;
+					}
+					entries.push(Manga {
+						key: key.into(),
+						title,
+						content_rating: ContentRating::NSFW,
+						..Default::default()
+					});
+				}
+			}
+			next = Self::next_page_url(&document)
+				.filter(|url| url.starts_with(&format!("{BASE_URL}/collection-index/")));
+		}
+		if !saw_collections {
+			bail!("HentaiRead returned no collections. If a Cloudflare challenge is visible, complete it and retry.");
+		}
+		Ok(MangaPageResult { entries, has_next_page: false })
+	}
+
+	fn collection_entries(url: &str) -> Result<Vec<Manga>> {
+		let mut entries: Vec<Manga> = Vec::new();
+		let mut visited = Vec::new();
+		let mut next = Some(url.to_owned());
+		while let Some(page_url) = next {
+			if visited.iter().any(|previous| previous == &page_url) {
+				break;
+			}
+			visited.push(page_url.clone());
+			let document = Request::get(&page_url)?.html()?;
+			let items = Self::manga_items(&document);
+			if items.is_empty() {
+				bail!("HentaiRead returned no collection entries. If a Cloudflare challenge is visible, complete it and retry.");
+			}
+			for item in items {
+				if !entries.iter().any(|entry| entry.key == item.key) {
+					entries.push(item);
+				}
+			}
+			next = Self::next_page_url(&document)
+				.filter(|next_url| next_url.starts_with(url));
+		}
+		Ok(entries)
 	}
 
 	fn browse(order: &str, page: i32) -> Result<MangaPageResult> {
@@ -392,7 +473,11 @@ impl Source for HentaiRead {
 		page: i32,
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
-		Self::parse_list(&Request::get(Self::search_url(query, page, filters)?)?.html()?)
+		if filters.iter().any(|filter| matches!(filter, FilterValue::Select { id, value } if id == "search_type" && value == "collection")) {
+			Self::search_collections(query, page)
+		} else {
+			Self::parse_list(&Request::get(Self::search_url(query, page, filters)?)?.html()?)
+		}
 	}
 
 	fn get_manga_update(
@@ -402,7 +487,15 @@ impl Source for HentaiRead {
 		needs_chapters: bool,
 	) -> Result<Manga> {
 		let url = Self::absolute_url(&manga.key);
-		let document = Request::get(&url)?.html()?;
+		let is_collection = manga.key.starts_with("/collection/");
+		let collection_entries = if is_collection { Some(Self::collection_entries(&url)?) } else { None };
+		let collection_title = manga.title.clone();
+		let details_url = collection_entries
+			.as_ref()
+			.and_then(|entries| entries.first())
+			.map(|entry| Self::absolute_url(&entry.key))
+			.unwrap_or_else(|| url.clone());
+		let document = Request::get(&details_url)?.html()?;
 		manga.title = document
 			.select_first("div.post-title h1, .manga-title h1, h1")
 			.and_then(|element| element.text())
@@ -430,26 +523,41 @@ impl Source for HentaiRead {
 			.select_first(".manga-titles h2")
 			.and_then(|element| element.text())
 			.map(|titles| format!("Alternative titles: {titles}"));
+		if is_collection {
+			manga.title = collection_title;
+		}
 		manga.status = MangaStatus::Completed;
 		manga.update_strategy = UpdateStrategy::Never;
 		manga.content_rating = ContentRating::NSFW;
 		manga.url = Some(url.clone());
 
 		if needs_chapters {
-			manga.chapters = Some(vec![Chapter {
-				key: manga.key.clone(),
-				title: Some("Chapter".into()),
-				chapter_number: Some(1.0),
-				url: Some(url),
-				language: Some("en".into()),
-				..Default::default()
-			}]);
+			manga.chapters = Some(if let Some(entries) = collection_entries {
+				let count = entries.len();
+				entries.into_iter().enumerate().map(|(index, entry)| Chapter {
+					key: entry.key.clone(),
+					title: Some(entry.title),
+					chapter_number: Some((count - index) as f32),
+					url: Some(Self::absolute_url(&entry.key)),
+					language: Some("en".into()),
+					..Default::default()
+				}).collect()
+			} else {
+				vec![Chapter {
+					key: manga.key.clone(),
+					title: Some("Chapter".into()),
+					chapter_number: Some(1.0),
+					url: Some(url),
+					language: Some("en".into()),
+					..Default::default()
+				}]
+			});
 		}
 		Ok(manga)
 	}
 
 	fn get_page_list(&self, manga: Manga, chapter: Chapter) -> Result<Vec<Page>> {
-		let manga_url = Self::absolute_url(&manga.key);
+		let manga_url = Self::absolute_url(if manga.key.starts_with("/collection/") { &chapter.key } else { &manga.key });
 		let mut reader_urls = Vec::new();
 		if chapter.key.contains("/p/") || chapter.key.contains("/english/") {
 			reader_urls.push(Self::absolute_url(&chapter.key));
@@ -540,7 +648,7 @@ impl DeepLinkHandler for HentaiRead {
 	fn handle_deep_link(&self, url: String) -> Result<Option<DeepLinkResult>> {
 		Ok(url
 			.strip_prefix(BASE_URL)
-			.filter(|path| path.contains("/hentai/"))
+			.filter(|path| path.starts_with("/hentai/") || path.starts_with("/collection/"))
 			.map(|key| DeepLinkResult::Manga { key: key.into() }))
 	}
 }
