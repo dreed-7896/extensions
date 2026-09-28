@@ -168,8 +168,9 @@ impl HentaiRead {
 			return Self::absolute_url(key);
 		};
 		// WordPress exposes the canonical term link when the taxonomy has REST enabled.
-		if let Ok(body) = Request::get(format!("{BASE_URL}/wp-json/wp/v2/collection/{id}"))
-			.and_then(|request| request.string())
+		if let Some(body) = Request::get(format!("{BASE_URL}/wp-json/wp/v2/collection/{id}"))
+			.ok()
+			.and_then(|request| request.string().ok())
 		{
 			if let Ok(term) = serde_json::from_str::<Value>(&body) {
 				if let Some(link) = term.get("link").and_then(Value::as_str)
