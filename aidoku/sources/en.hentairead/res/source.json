@@ -2,7 +2,7 @@
 	"info": {
 		"id": "en.hentairead",
 		"name": "HentaiRead",
-		"version": 5,
+		"version": 6,
 		"url": "https://hentairead.com",
 		"contentRating": 2,
 		"languages": ["en"],
@@ -15,7 +15,7 @@
 		},
 		{
 			"id": "recent",
-			"name": "Recently Added"
+			"name": "Latest"
 		}
 	]
 }
