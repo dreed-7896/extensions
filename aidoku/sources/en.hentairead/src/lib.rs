@@ -149,7 +149,45 @@ impl HentaiRead {
 		Ok(MangaPageResult { entries, has_next_page })
 	}
 
-	fn collection_url(key: &str, title: &str) -> Result<String> {
+	fn collection_slug(title: &str) -> String {
+		let mut slug = String::new();
+		for character in title.chars() {
+			if character.is_ascii_alphanumeric() {
+				slug.push(character.to_ascii_lowercase());
+			} else if !slug.is_empty() && !slug.ends_with('-') {
+				slug.push('-');
+			}
+		}
+		slug.trim_end_matches('-').into()
+	}
+
+	fn collection_url(key: &str, title: &str) -> String {
+		let Some(id) = key.strip_prefix("/collection/__term__/")
+			.map(|value| value.trim_end_matches('/'))
+		else {
+			return Self::absolute_url(key);
+		};
+		// WordPress exposes the canonical term link when the taxonomy has REST enabled.
+		if let Ok(body) = Request::get(format!("{BASE_URL}/wp-json/wp/v2/collection/{id}"))
+			.and_then(|request| request.string())
+		{
+			if let Ok(term) = serde_json::from_str::<Value>(&body) {
+				if let Some(link) = term.get("link").and_then(Value::as_str)
+					.filter(|link| link.starts_with(BASE_URL))
+				{
+					return link.into();
+				}
+				if let Some(slug) = term.get("slug").and_then(Value::as_str)
+					.filter(|slug| !slug.is_empty())
+				{
+					return format!("{BASE_URL}/collection/{slug}/");
+				}
+			}
+		}
+		format!("{BASE_URL}/collection/{}/", Self::collection_slug(title))
+	}
+
+	fn collection_index_url(key: &str, title: &str) -> Result<String> {
 		let Some(id) = key.strip_prefix("/collection/__term__/")
 			.map(|value| value.trim_end_matches('/'))
 		else {
@@ -165,7 +203,7 @@ impl HentaiRead {
 				for link in links {
 					let Some(href) = link.attr("abs:href").or_else(|| link.attr("href")) else { continue };
 					let url = Self::absolute_url(&href);
-					if !url.starts_with(&format!("{BASE_URL}/collection/")) { continue; }
+					if !url.starts_with(BASE_URL) || !url.contains("/collection/") { continue; }
 					let name = link.text().unwrap_or_default();
 					let name = name.trim();
 					let title_matches = name.eq_ignore_ascii_case(title)
@@ -510,12 +548,22 @@ impl Source for HentaiRead {
 		needs_chapters: bool,
 	) -> Result<Manga> {
 		let is_collection = manga.key.starts_with("/collection/");
-		let url = if is_collection {
-			Self::collection_url(&manga.key, &manga.title)?
+		let (url, collection_entries) = if is_collection {
+			let primary_url = Self::collection_url(&manga.key, &manga.title);
+			match Self::collection_entries(&primary_url) {
+				Ok(entries) => (primary_url, Some(entries)),
+				Err(primary_error) if manga.key.starts_with("/collection/__term__/") => {
+					// Fall back to the site's index for unusual term slugs.
+					let index_url = Self::collection_index_url(&manga.key, &manga.title)
+						.map_err(|_| primary_error)?;
+					let entries = Self::collection_entries(&index_url)?;
+					(index_url, Some(entries))
+				}
+				Err(error) => return Err(error),
+			}
 		} else {
-			Self::absolute_url(&manga.key)
+			(Self::absolute_url(&manga.key), None)
 		};
-		let collection_entries = if is_collection { Some(Self::collection_entries(&url)?) } else { None };
 		let collection_title = manga.title.clone();
 		let details_url = collection_entries
 			.as_ref()
