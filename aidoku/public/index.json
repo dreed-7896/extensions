@@ -53,9 +53,9 @@
     {
       "id": "en.hentairead",
       "name": "HentaiRead",
-      "version": 10,
-      "iconURL": "icons/en.hentairead-v10.png",
-      "downloadURL": "sources/en.hentairead-v10.aix",
+      "version": 11,
+      "iconURL": "icons/en.hentairead-v11.png",
+      "downloadURL": "sources/en.hentairead-v11.aix",
       "languages": [
         "en"
       ],
