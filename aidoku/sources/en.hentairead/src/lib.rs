@@ -187,9 +187,6 @@ impl HentaiRead {
 		for character in Self::decode_collection_title(title).chars() {
 			if character.is_ascii_alphanumeric() {
 				slug.push(character.to_ascii_lowercase());
-			} else if matches!(character, '\'' | '’' | '‘' | '"') {
-				// WordPress drops apostrophes instead of separating the word.
-				continue;
 			} else if !slug.is_empty() && !slug.ends_with('-') {
 				slug.push('-');
 			}
@@ -621,14 +618,15 @@ impl Source for HentaiRead {
 			let term_id = manga.key.strip_prefix("/collection/__term__/")
 				.map(|value| value.trim_end_matches('/'));
 			if let Some(id) = term_id {
-				match Self::collection_entries_by_term_id(id) {
-					Ok((url, entries)) => (url, Some(entries)),
-					Err(filter_error) => {
-						let primary_url = Self::collection_url(&manga.key, &manga.title);
-						match Self::collection_entries(&primary_url) {
-							Ok(entries) => (primary_url, Some(entries)),
-							Err(_) => {
-								// An archive can use a custom slug; try its index link too.
+				// The archive contains the site's chapter order and numbered badges.
+				// Filtered search results are only a fallback; they sort by release date.
+				let primary_url = Self::collection_url(&manga.key, &manga.title);
+				match Self::collection_entries(&primary_url) {
+					Ok(entries) => (primary_url, Some(entries)),
+					Err(_) => {
+						match Self::collection_entries_by_term_id(id) {
+							Ok((url, entries)) => (url, Some(entries)),
+							Err(filter_error) => {
 								let index_url = Self::collection_index_url(&manga.key, &manga.title)
 									.map_err(|_| filter_error)?;
 								let entries = Self::collection_entries(&index_url)?;
@@ -648,7 +646,11 @@ impl Source for HentaiRead {
 		let collection_title = if is_collection { Self::decode_collection_title(&manga.title) } else { manga.title.clone() };
 		let details_url = collection_entries
 			.as_ref()
-			.and_then(|entries| entries.first())
+			.and_then(|entries| {
+				entries.iter().filter(|entry| entry.1.is_some())
+					.min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(core::cmp::Ordering::Equal))
+					.or_else(|| entries.last())
+			})
 			.map(|entry| Self::absolute_url(&entry.0.key))
 			.unwrap_or_else(|| url.clone());
 		let document = Request::get(&details_url)?.html()?;
@@ -688,7 +690,12 @@ impl Source for HentaiRead {
 		manga.url = Some(url.clone());
 
 		if needs_chapters {
-			manga.chapters = Some(if let Some(entries) = collection_entries {
+			manga.chapters = Some(if let Some(mut entries) = collection_entries {
+				// Use the site's badge numbers when every entry has one; otherwise keep
+				// the archive's order instead of sorting partially numbered chapters.
+				if entries.iter().all(|entry| entry.1.is_some()) {
+					entries.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(core::cmp::Ordering::Equal));
+				}
 				let count = entries.len();
 				entries.into_iter().enumerate().map(|(index, (entry, number))| Chapter {
 					key: entry.key.clone(),
