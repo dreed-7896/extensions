@@ -289,6 +289,37 @@ impl HentaiRead {
 		Ok(entries)
 	}
 
+
+	fn collection_entries_by_term_id(id: &str) -> Result<(String, Vec<(Manga, Option<f32>)>)> {
+		// The site's search accepts the collection term ID as a filter. This avoids
+		// guessing a taxonomy slug from the display name (which may contain entities).
+		let mut entries: Vec<(Manga, Option<f32>)> = Vec::new();
+		let mut first_url = String::new();
+		for page in 1..=100 {
+			let mut params = QueryParameters::new();
+			params.push("s", Some(""));
+			params.push("title-type", Some("contains"));
+			params.push("collections[]", Some(id));
+			let url = format!("{BASE_URL}/page/{page}/?{params}");
+			if page == 1 { first_url = url.clone(); }
+			let document = Request::get(&url)?.html()?;
+			let items = Self::collection_items(&document);
+			if items.is_empty() {
+				if page == 1 {
+					bail!("HentaiRead returned no entries for collection ID {id}");
+				}
+				break;
+			}
+			for item in items {
+				if !entries.iter().any(|entry| entry.0.key == item.0.key) {
+					entries.push(item);
+				}
+			}
+			if Self::next_page_url(&document).is_none() { break; }
+		}
+		Ok((first_url, entries))
+	}
+
 	fn browse(order: &str, page: i32) -> Result<MangaPageResult> {
 		let path = if page > 1 {
 			format!("/hentai/page/{page}/")
@@ -587,17 +618,29 @@ impl Source for HentaiRead {
 	) -> Result<Manga> {
 		let is_collection = manga.key.starts_with("/collection/");
 		let (url, collection_entries) = if is_collection {
-			let primary_url = Self::collection_url(&manga.key, &manga.title);
-			match Self::collection_entries(&primary_url) {
-				Ok(entries) => (primary_url, Some(entries)),
-				Err(primary_error) if manga.key.starts_with("/collection/__term__/") => {
-					// Fall back to the site's index for unusual term slugs.
-					let index_url = Self::collection_index_url(&manga.key, &manga.title)
-						.map_err(|_| primary_error)?;
-					let entries = Self::collection_entries(&index_url)?;
-					(index_url, Some(entries))
+			let term_id = manga.key.strip_prefix("/collection/__term__/")
+				.map(|value| value.trim_end_matches('/'));
+			if let Some(id) = term_id {
+				match Self::collection_entries_by_term_id(id) {
+					Ok((url, entries)) => (url, Some(entries)),
+					Err(filter_error) => {
+						let primary_url = Self::collection_url(&manga.key, &manga.title);
+						match Self::collection_entries(&primary_url) {
+							Ok(entries) => (primary_url, Some(entries)),
+							Err(_) => {
+								// An archive can use a custom slug; try its index link too.
+								let index_url = Self::collection_index_url(&manga.key, &manga.title)
+									.map_err(|_| filter_error)?;
+								let entries = Self::collection_entries(&index_url)?;
+								(index_url, Some(entries))
+							}
+						}
+					}
 				}
-				Err(error) => return Err(error),
+			} else {
+				let url = Self::collection_url(&manga.key, &manga.title);
+				let entries = Self::collection_entries(&url)?;
+				(url, Some(entries))
 			}
 		} else {
 			(Self::absolute_url(&manga.key), None)
