@@ -152,11 +152,11 @@ impl HentaiRead {
 				let id = item.get("id")?;
 				let id = id.as_i64().map(|id| id.to_string())
 					.or_else(|| id.as_str().map(ToOwned::to_owned))?;
-				let title = item.get("text")?.as_str()?.trim();
+				let title = Self::decode_collection_title(item.get("text")?.as_str()?.trim());
 				if title.is_empty() { return None; }
 				Some(Manga {
 					key: format!("/collection/__term__/{id}/"),
-					title: title.into(),
+					title,
 					content_rating: ContentRating::NSFW,
 					..Default::default()
 				})
@@ -167,11 +167,29 @@ impl HentaiRead {
 		Ok(MangaPageResult { entries, has_next_page })
 	}
 
+	fn decode_collection_title(title: &str) -> String {
+		title
+			.replace("&amp;", "&")
+			.replace("&#039;", "'")
+			.replace("&#39;", "'")
+			.replace("&#x27;", "'")
+			.replace("&#X27;", "'")
+			.replace("&#8217;", "’")
+			.replace("&#x2019;", "’")
+			.replace("&apos;", "'")
+			.replace("&rsquo;", "’")
+			.replace("&lsquo;", "‘")
+			.replace("&quot;", "\"")
+	}
+
 	fn collection_slug(title: &str) -> String {
 		let mut slug = String::new();
-		for character in title.chars() {
+		for character in Self::decode_collection_title(title).chars() {
 			if character.is_ascii_alphanumeric() {
 				slug.push(character.to_ascii_lowercase());
+			} else if matches!(character, '\'' | '’' | '‘' | '"') {
+				// WordPress drops apostrophes instead of separating the word.
+				continue;
 			} else if !slug.is_empty() && !slug.ends_with('-') {
 				slug.push('-');
 			}
@@ -223,10 +241,11 @@ impl HentaiRead {
 					let Some(href) = link.attr("abs:href").or_else(|| link.attr("href")) else { continue };
 					let url = Self::absolute_url(&href);
 					if !url.starts_with(BASE_URL) || !url.contains("/collection/") { continue; }
-					let name = link.text().unwrap_or_default();
+					let name = Self::decode_collection_title(&link.text().unwrap_or_default());
+					let title = Self::decode_collection_title(title);
 					let name = name.trim();
-					let title_matches = name.eq_ignore_ascii_case(title)
-						|| name.strip_prefix(title).map(|suffix| suffix.trim().starts_with('(')).unwrap_or(false);
+					let title_matches = name.eq_ignore_ascii_case(&title)
+						|| name.strip_prefix(title.as_str()).map(|suffix| suffix.trim().starts_with('(')).unwrap_or(false);
 					let id_matches = link.attr("data-term-id").or_else(|| link.attr("data-id"))
 						.map(|value| value == id).unwrap_or(false);
 					if id_matches || title_matches { return Ok(url); }
@@ -583,7 +602,7 @@ impl Source for HentaiRead {
 		} else {
 			(Self::absolute_url(&manga.key), None)
 		};
-		let collection_title = manga.title.clone();
+		let collection_title = if is_collection { Self::decode_collection_title(&manga.title) } else { manga.title.clone() };
 		let details_url = collection_entries
 			.as_ref()
 			.and_then(|entries| entries.first())
