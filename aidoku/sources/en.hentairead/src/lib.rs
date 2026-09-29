@@ -65,39 +65,57 @@ impl HentaiRead {
 			|| value.contains("avatar")
 	}
 
+	fn parse_manga_item(element: &aidoku::imports::html::Element) -> Option<Manga> {
+		let link = element.select_first("h3 a[href*='/hentai/']")?;
+		let title = link
+			.attr("title")
+			.filter(|title| !title.trim().is_empty())
+			.or_else(|| link.text())?
+			.trim()
+			.to_owned();
+		if title.is_empty() {
+			return None;
+		}
+		let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
+		let cover = element
+			.select_first("img.manga-item__img-inner, img")
+			.and_then(|image| Self::image_url(&image));
+		let absolute_url = Self::absolute_url(&href);
+		Some(Manga {
+			key: absolute_url
+				.strip_prefix(BASE_URL)
+				.unwrap_or(&href)
+				.into(),
+			title,
+			cover,
+			content_rating: ContentRating::NSFW,
+			..Default::default()
+		})
+	}
+
 	fn manga_items(document: &aidoku::imports::html::Document) -> Vec<Manga> {
 		document
 			.select("div.manga-item")
+			.map(|elements| elements.filter_map(|element| Self::parse_manga_item(&element)).collect())
+			.unwrap_or_default()
+	}
+
+	fn collection_items(document: &aidoku::imports::html::Document) -> Vec<(Manga, Option<f32>)> {
+		document
+			.select("div.manga-item")
 			.map(|elements| {
-				elements
-					.filter_map(|element| {
-						let link = element.select_first("h3 a[href*='/hentai/']")?;
-						let title = link
-							.attr("title")
-							.filter(|title| !title.trim().is_empty())
-							.or_else(|| link.text())?
-							.trim()
-							.to_owned();
-						if title.is_empty() {
-							return None;
-						}
-						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
-						let cover = element
-							.select_first("img.manga-item__img-inner, img")
-							.and_then(|image| Self::image_url(&image));
-						let absolute_url = Self::absolute_url(&href);
-						Some(Manga {
-							key: absolute_url
-								.strip_prefix(BASE_URL)
-								.unwrap_or(&href)
-								.into(),
-							title,
-							cover,
-							content_rating: ContentRating::NSFW,
-							..Default::default()
-						})
-					})
-					.collect()
+				elements.filter_map(|element| {
+					let manga = Self::parse_manga_item(&element)?;
+					// The collection's blue circular badge contains the chapter number.
+					// Parse only number badges so the rating and page count cannot be mistaken for it.
+					let number = element
+						.select("[data-chapter-number], [class*='chapter-number'], [class*='rounded-full']")
+						.and_then(|badges| badges.filter_map(|badge| {
+							badge.attr("data-chapter-number").or_else(|| badge.text())
+								.and_then(|value| value.trim().parse::<f32>().ok())
+						}).next());
+					Some((manga, number))
+				}).collect()
 			})
 			.unwrap_or_default()
 	}
@@ -227,8 +245,8 @@ impl HentaiRead {
 		}
 	}
 
-	fn collection_entries(url: &str) -> Result<Vec<Manga>> {
-		let mut entries: Vec<Manga> = Vec::new();
+	fn collection_entries(url: &str) -> Result<Vec<(Manga, Option<f32>)>> {
+		let mut entries: Vec<(Manga, Option<f32>)> = Vec::new();
 		let mut visited = Vec::new();
 		let mut next = Some(url.to_owned());
 		while let Some(page_url) = next {
@@ -237,12 +255,12 @@ impl HentaiRead {
 			}
 			visited.push(page_url.clone());
 			let document = Request::get(&page_url)?.html()?;
-			let items = Self::manga_items(&document);
+			let items = Self::collection_items(&document);
 			if items.is_empty() {
 				bail!("HentaiRead returned no collection entries. If a Cloudflare challenge is visible, complete it and retry.");
 			}
 			for item in items {
-				if !entries.iter().any(|entry| entry.key == item.key) {
+				if !entries.iter().any(|entry| entry.0.key == item.0.key) {
 					entries.push(item);
 				}
 			}
@@ -569,7 +587,7 @@ impl Source for HentaiRead {
 		let details_url = collection_entries
 			.as_ref()
 			.and_then(|entries| entries.first())
-			.map(|entry| Self::absolute_url(&entry.key))
+			.map(|entry| Self::absolute_url(&entry.0.key))
 			.unwrap_or_else(|| url.clone());
 		let document = Request::get(&details_url)?.html()?;
 		manga.title = document
@@ -610,10 +628,10 @@ impl Source for HentaiRead {
 		if needs_chapters {
 			manga.chapters = Some(if let Some(entries) = collection_entries {
 				let count = entries.len();
-				entries.into_iter().enumerate().map(|(index, entry)| Chapter {
+				entries.into_iter().enumerate().map(|(index, (entry, number))| Chapter {
 					key: entry.key.clone(),
 					title: Some(entry.title),
-					chapter_number: Some((count - index) as f32),
+					chapter_number: number.or(Some((count - index) as f32)),
 					url: Some(Self::absolute_url(&entry.key)),
 					language: Some("en".into()),
 					..Default::default()
