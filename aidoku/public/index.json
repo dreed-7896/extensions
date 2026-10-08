@@ -128,6 +128,21 @@
       "baseURL": "https://imhentai.xxx"
     },
     {
+      "id": "multi.nhentai",
+      "name": "nhentai",
+      "version": 18,
+      "iconURL": "icons/multi.nhentai-v18.png",
+      "downloadURL": "sources/multi.nhentai-v18.aix",
+      "languages": [
+        "All",
+        "en",
+        "ja",
+        "zh"
+      ],
+      "contentRating": 2,
+      "baseURL": "https://nhentai.net"
+    },
+    {
       "id": "multi.pandachaika",
       "name": "PandaChaika",
       "version": 3,
