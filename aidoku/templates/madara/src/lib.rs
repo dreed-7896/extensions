@@ -2,7 +2,7 @@
 
 use aidoku::{
 	alloc::{borrow::ToOwned, format, string::{String, ToString}, vec, vec::Vec},
-	imports::{html::Element, net::Request},
+	imports::{html::Element, net::Request, std::{current_date, parse_date_with_options}},
 	prelude::*,
 	Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, ImageRequestProvider,
 	Home, HomeComponent, HomeComponentValue, HomeLayout, Listing, ListingProvider, Manga,
@@ -152,10 +152,19 @@ impl<I: Impl> Madara<I> {
 						let href = link.attr("abs:href").or_else(|| link.attr("href"))?;
 						let title = link.text().map(|text| text.trim().to_owned());
 						let chapter_number = title.as_ref().and_then(|text| extract_number(text));
+						let release = element.select_first(".chapter-release-date, .chapter-release, time");
+						let date_uploaded = release.and_then(|release| {
+							release.attr("datetime").and_then(|value| parse_release_date(&value))
+								.or_else(|| release.attr("title").and_then(|value| parse_release_date(&value)))
+								.or_else(|| release.select_first("[datetime]").and_then(|date| date.attr("datetime")).and_then(|value| parse_release_date(&value)))
+								.or_else(|| release.select_first("[title]").and_then(|date| date.attr("title")).and_then(|value| parse_release_date(&value)))
+								.or_else(|| release.text().and_then(|value| parse_release_date(&value)))
+						});
 						Some(Chapter {
 							key: self.absolute_url(&href),
 							title,
 							chapter_number,
+							date_uploaded,
 							url: Some(self.absolute_url(&href)),
 							language: Some("en".into()),
 							..Default::default()
@@ -381,4 +390,37 @@ fn extract_number(value: &str) -> Option<f32> {
 		}
 	}
 	found.parse().ok()
+}
+
+/// Dates supplied by the website only; absent/unrecognized dates remain absent.
+pub fn parse_release_date(value: &str) -> Option<i64> {
+	let value = value.trim();
+	if value.is_empty() { return None; }
+	for format in [
+		"yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX", "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
+		"yyyy-MM-dd'T'HH:mm:ssXXXXX", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd",
+		"MMMM d, yyyy", "MMM d, yyyy", "d MMMM yyyy", "d MMM yyyy", "MM/dd/yyyy",
+	] {
+		if let Some(timestamp) = parse_date_with_options(value, format, "en_US_POSIX", "UTC") {
+			return Some(timestamp);
+		}
+	}
+	let lower = value.to_ascii_lowercase();
+	let seconds = if lower == "today" { Some(0) }
+		else if lower == "yesterday" { Some(86_400) }
+		else if lower.ends_with("ago") {
+			let mut words = lower.split_whitespace();
+			let count: i64 = words.next()?.parse().ok()?;
+			let unit = words.next()?;
+			let multiplier = match unit {
+				"second" | "seconds" => 1,
+				"minute" | "minutes" => 60,
+				"hour" | "hours" => 3_600,
+				"day" | "days" => 86_400,
+				"week" | "weeks" => 604_800,
+				_ => return None,
+			};
+			(count >= 0).then(|| count.checked_mul(multiplier)).flatten()
+		} else { None };
+	seconds.and_then(|seconds| current_date().checked_sub(seconds))
 }

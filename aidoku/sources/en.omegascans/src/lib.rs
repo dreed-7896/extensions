@@ -62,6 +62,7 @@ struct ChapterDto {
 	#[serde(rename = "chapter_slug")]
 	slug: String,
 	price: Option<i32>,
+	created_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -196,6 +197,7 @@ impl OmegaScans {
 					key: format!("/chapter/{series_slug}/{}", chapter.slug),
 					title,
 					chapter_number: number,
+					date_uploaded: chapter.created_at.as_deref().and_then(midoku_madara::parse_release_date),
 					url: Some(format!("{BASE_URL}/series/{series_slug}/{}", chapter.slug)),
 					language: Some("en".into()),
 					..Default::default()
