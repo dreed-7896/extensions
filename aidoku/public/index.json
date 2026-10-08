@@ -4,14 +4,15 @@
     {
       "id": "en.allporncomic",
       "name": "AllPornComic",
-      "version": 3,
-      "iconURL": "icons/en.allporncomic-v3.png",
-      "downloadURL": "sources/en.allporncomic-v3.aix",
+      "version": 4,
+      "iconURL": "icons/en.allporncomic-v4.png",
+      "downloadURL": "sources/en.allporncomic-v4.aix",
       "languages": [
         "en"
       ],
       "contentRating": 2,
-      "baseURL": "https://allporncomic.com"
+      "baseURL": "https://allporncomic.com",
+      "minAppVersion": "0.7.1"
     },
     {
       "id": "en.doujins",
@@ -91,14 +92,15 @@
     {
       "id": "en.omegascans",
       "name": "Omega Scans",
-      "version": 2,
-      "iconURL": "icons/en.omegascans-v2.png",
-      "downloadURL": "sources/en.omegascans-v2.aix",
+      "version": 3,
+      "iconURL": "icons/en.omegascans-v3.png",
+      "downloadURL": "sources/en.omegascans-v3.aix",
       "languages": [
         "en"
       ],
       "contentRating": 2,
-      "baseURL": "https://omegascans.org"
+      "baseURL": "https://omegascans.org",
+      "minAppVersion": "0.7.1"
     },
     {
       "id": "multi.ehentai",
