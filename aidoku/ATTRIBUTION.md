@@ -2,7 +2,7 @@
 
 The source behavior and selectors were adapted from the corresponding extensions in
 [keiyoushi/extensions-source](https://github.com/keiyoushi/extensions-source): PandaChaika,
-AllPornComic, Doujins, HentaiNexus, HentaiRead, NovelCrow, HiperDex, and Omega Scans. Hentai2Read
+AllPornComic, Doujins, HentaiNexus, HentaiRead, ManhwaRead, NovelCrow, HiperDex, and Omega Scans. Hentai2Read
 behavior was adapted from the corresponding source in
 [yuzono/cursed-manga-extensions](https://github.com/yuzono/cursed-manga-extensions).
 

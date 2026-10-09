@@ -1,0 +1,26 @@
+[
+	{
+		"type": "group",
+		"title": "Website",
+		"items": [
+			{
+				"type": "select",
+				"key": "domain",
+				"title": "Domain",
+				"values": [
+					"https://manhwaread.com",
+					"https://manhwaread.org"
+				],
+				"titles": [
+					"manhwaread.com",
+					"manhwaread.org"
+				],
+				"default": "https://manhwaread.com",
+				"refreshes": [
+					"content",
+					"listings"
+				]
+			}
+		]
+	}
+]
