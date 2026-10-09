@@ -77,6 +77,19 @@
       "baseURL": "https://hiperdex.tv"
     },
     {
+      "id": "en.manhwaread",
+      "name": "ManhwaRead",
+      "version": 1,
+      "iconURL": "icons/en.manhwaread-v1.png",
+      "downloadURL": "sources/en.manhwaread-v1.aix",
+      "languages": [
+        "en"
+      ],
+      "contentRating": 1,
+      "baseURL": "https://manhwaread.com",
+      "minAppVersion": "0.7.1"
+    },
+    {
       "id": "en.novelcrow",
       "name": "NovelCrow",
       "version": 5,
