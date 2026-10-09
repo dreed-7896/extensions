@@ -196,6 +196,41 @@ impl ManhwaRead {
         (!values.is_empty()).then_some(values)
     }
 
+    fn creator_names(document: &Document, role: &str) -> Option<Vec<String>> {
+        // Match taxonomy links directly. Labels, sibling wrappers and the first
+        // child of a creator link vary between the site's detail layouts.
+        let selector = match role {
+            "author" => {
+                "#mangaSummary a[href*='/author/'], #mangaSummary a[href*='/manga-author/'], #mangaSummary a[href*='/manga_author/'], #mangaSummary .text-primary:contains(Author) + .flex a"
+            }
+            "artist" => {
+                "#mangaSummary a[href*='/artist/'], #mangaSummary a[href*='/manga-artist/'], #mangaSummary a[href*='/manga_artist/'], #mangaSummary .text-primary:contains(Artist) + .flex a"
+            }
+            _ => return None,
+        };
+        let mut names = Vec::new();
+        for link in document.select(selector)? {
+            // Read the name span separately so entry-count badges aren't names.
+            // Allow an icon or an empty span before the name, and plain-text links.
+            let name = link
+                .select("span")
+                .and_then(|spans| {
+                    spans
+                        .filter_map(|span| span.text())
+                        .find(|text| !text.trim().is_empty())
+                })
+                .or_else(|| link.text())
+                .map(|text| text.trim().to_owned())
+                .filter(|text| !text.is_empty());
+            if let Some(name) = name {
+                if !names.contains(&name) {
+                    names.push(name);
+                }
+            }
+        }
+        (!names.is_empty()).then_some(names)
+    }
+
     fn chapters(document: &Document) -> Vec<Chapter> {
         let mut chapters = document
             .select("#chaptersList > a.chapter-item")
@@ -297,14 +332,6 @@ impl Source for ManhwaRead {
                 .and_then(|element| element.attr("content"))
                 .map(|value| parser::absolute_url(Self::base_url(), &value))
                 .or(manga.cover);
-            manga.authors = Self::text_list(
-                &document,
-                "#mangaSummary .text-primary:contains(Author:) + .flex a span:first-child",
-            );
-            manga.artists = Self::text_list(
-                &document,
-                "#mangaSummary .text-primary:contains(Artist:) + .flex a span:first-child",
-            );
             let mut description = document
                 .select_first("#mangaDesc > .manga-desc__content")
                 .and_then(|element| element.text())
@@ -346,6 +373,10 @@ impl Source for ManhwaRead {
             manga.viewer = Viewer::Webtoon;
             manga.url = Some(url);
         }
+        // A chapter refresh also loads this detail page, so repair missing
+        // creator metadata without requiring the title to be removed/re-added.
+        manga.authors = Self::creator_names(&document, "author").or(manga.authors);
+        manga.artists = Self::creator_names(&document, "artist").or(manga.artists);
         if needs_chapters {
             let chapters = Self::chapters(&document);
             // Keep stored chapters intact if a broken/challenged page omits the list.
