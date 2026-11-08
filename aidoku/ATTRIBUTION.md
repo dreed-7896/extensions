@@ -19,4 +19,4 @@ at commit `96c64246205ceeca34a89927ff3b8eb6a60ca094`. Its original MIT and Apach
 are included in `sources/multi.hitomi/`.
 
 The nhentai, Hitomi and IMHentai sources accept `term one | term two` searches: each term is
-searched separately and the results are merged without duplicates.
+searched separately and the results are merged without duplicates, newest first by gallery ID.

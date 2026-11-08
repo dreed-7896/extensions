@@ -19,7 +19,8 @@ pub fn terms(query: Option<&str>) -> Option<Vec<String>> {
 	if terms.is_empty() { None } else { Some(terms) }
 }
 
-/// Runs every term for the same page and interleaves the results without duplicates.
+/// Runs every term for the same page and merges the results without duplicates, newest first.
+/// Gallery IDs grow with upload order on these sites, so the ID stands in for the upload date.
 /// A term that fails is skipped unless every term fails.
 pub fn search<F>(terms: Vec<String>, mut run: F) -> Result<MangaPageResult>
 where
@@ -64,8 +65,24 @@ where
 			break;
 		}
 	}
+	// Stable sort: entries without a numeric ID keep their interleaved order at the end.
+	entries.sort_by_key(|manga| core::cmp::Reverse(gallery_id(&manga.key)));
 	Ok(MangaPageResult {
 		entries,
 		has_next_page,
 	})
+}
+
+/// The numeric gallery ID in a key such as `123456` or `/gallery/123456/`.
+fn gallery_id(key: &str) -> Option<u64> {
+	let digits: String = key
+		.trim_end_matches('/')
+		.chars()
+		.rev()
+		.take_while(|c| c.is_ascii_digit())
+		.collect::<Vec<char>>()
+		.into_iter()
+		.rev()
+		.collect();
+	digits.parse().ok()
 }

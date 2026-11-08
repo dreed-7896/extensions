@@ -337,6 +337,18 @@ impl Source for IMHentai {
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
 		if let Some(terms) = multi_search::terms(query.as_deref()) {
+			// Mixed results are ordered by date, so search each term by Latest unless a sort was chosen.
+			let mut filters = filters;
+			if !filters
+				.iter()
+				.any(|filter| matches!(filter, FilterValue::Sort { id, .. } if id == "sort"))
+			{
+				filters.push(FilterValue::Sort {
+					id: "sort".into(),
+					index: 1,
+					ascending: false,
+				});
+			}
 			return multi_search::search(terms, |term| {
 				Self::search(Some(term), page, filters.clone())
 			});
