@@ -18,5 +18,5 @@ The Hitomi source is adapted from [Aidoku-Community/sources](https://github.com/
 at commit `96c64246205ceeca34a89927ff3b8eb6a60ca094`. Its original MIT and Apache 2.0 licenses
 are included in `sources/multi.hitomi/`.
 
-The nhentai, Hitomi and IMHentai sources accept `term one | term two` in the search and in text filters such as Artist: each alternative is
-searched separately and the results are merged without duplicates, newest first by gallery ID.
+The nhentai, Hitomi, IMHentai and HentaiRead sources accept `term one | term two` in the search and in text filters such as Artist: each alternative is
+searched separately and the results are merged without duplicates, newest first by gallery ID (HentaiRead has no numeric IDs, so it alternates between the terms' latest results).

@@ -18,11 +18,21 @@ use aidoku::{
 use base64::{engine::general_purpose::{STANDARD, URL_SAFE}, Engine as _};
 use serde_json::Value;
 
+mod multi_search;
+
 const BASE_URL: &str = "https://hentairead.com";
 
 struct HentaiRead;
 
 impl HentaiRead {
+	fn search_single(query: Option<String>, page: i32, filters: Vec<FilterValue>) -> Result<MangaPageResult> {
+		if filters.iter().any(|filter| matches!(filter, FilterValue::Select { id, value } if id == "search_type" && value == "collection")) {
+			Self::search_collections(query, page)
+		} else {
+			Self::parse_list(&Request::get(Self::search_url(query, page, filters)?)?.html()?)
+		}
+	}
+
 	fn absolute_url(value: &str) -> String {
 		if value.starts_with("http://") || value.starts_with("https://") {
 			value.into()
@@ -600,11 +610,12 @@ impl Source for HentaiRead {
 		page: i32,
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
-		if filters.iter().any(|filter| matches!(filter, FilterValue::Select { id, value } if id == "search_type" && value == "collection")) {
-			Self::search_collections(query, page)
-		} else {
-			Self::parse_list(&Request::get(Self::search_url(query, page, filters)?)?.html()?)
+		if let Some(variants) = multi_search::variants(query.as_deref(), &filters) {
+			return multi_search::search(variants, |(query, filters)| {
+				Self::search_single(query, page, filters)
+			});
 		}
+		Self::search_single(query, page, filters)
 	}
 
 	fn get_manga_update(
