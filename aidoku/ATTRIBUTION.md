@@ -13,3 +13,10 @@ The nhentai source is adapted from [Aidoku-Community/sources](https://github.com
 at commit `39f02785b37249bf2ff543f41ab3b265c025f3d4`. Its original MIT and Apache 2.0 licenses
 are included in `sources/multi.nhentai/`. The Midoku version uses the v2 API, validates
 error responses, and accepts imported gallery URL keys while preserving saved identities.
+
+The Hitomi source is adapted from [Aidoku-Community/sources](https://github.com/Aidoku-Community/sources)
+at commit `96c64246205ceeca34a89927ff3b8eb6a60ca094`. Its original MIT and Apache 2.0 licenses
+are included in `sources/multi.hitomi/`.
+
+The nhentai, Hitomi and IMHentai sources accept `term one | term two` searches: each term is
+searched separately and the results are merged without duplicates.

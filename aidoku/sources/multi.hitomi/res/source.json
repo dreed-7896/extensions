@@ -1,0 +1,65 @@
+{
+	"info": {
+		"id": "multi.hitomi",
+		"name": "Hitomi",
+		"version": 3,
+		"url": "https://hitomi.la",
+		"contentRating": 2,
+		"languages": [
+			"All",
+			"en",
+			"id",
+			"jv",
+			"ca",
+			"ceb",
+			"cs",
+			"da",
+			"de",
+			"et",
+			"es",
+			"eo",
+			"fr",
+			"it",
+			"hi",
+			"hu",
+			"pl",
+			"pt",
+			"vi",
+			"tr",
+			"ru",
+			"uk",
+			"ar",
+			"ko",
+			"zh",
+			"ja"
+		],
+		"minAppVersion": "0.7.1"
+	},
+	"listings": [
+		{
+			"id": "date_added",
+			"name": "Recently Added"
+		},
+		{
+			"id": "popular_today",
+			"name": "Popular Today"
+		},
+		{
+			"id": "popular_week",
+			"name": "Popular Week"
+		},
+		{
+			"id": "popular_month",
+			"name": "Popular Month"
+		},
+		{
+			"id": "popular_year",
+			"name": "Popular Year"
+		}
+	],
+	"config": {
+		"languageSelectType": "single",
+		"supportsAuthorSearch": true,
+		"supportsTagSearch": true
+	}
+}

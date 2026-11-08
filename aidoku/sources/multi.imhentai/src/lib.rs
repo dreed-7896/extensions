@@ -17,6 +17,8 @@ use aidoku::{
 };
 use serde_json::Value;
 
+mod multi_search;
+
 const BASE_URL: &str = "https://imhentai.xxx";
 const USER_AGENT: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const CATEGORY_IDS: [&str; 6] = ["m", "d", "w", "i", "a", "g"];
@@ -334,6 +336,11 @@ impl Source for IMHentai {
 		page: i32,
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
+		if let Some(terms) = multi_search::terms(query.as_deref()) {
+			return multi_search::search(terms, |term| {
+				Self::search(Some(term), page, filters.clone())
+			});
+		}
 		Self::search(query, page, filters)
 	}
 

@@ -11,6 +11,7 @@ use aidoku::{
 mod api;
 mod home;
 mod models;
+mod multi_search;
 mod settings;
 
 use core::cell::RefCell;
@@ -29,24 +30,7 @@ struct NHentai {
 }
 
 impl NHentai {
-	fn fetch_gallery(&self, key: &str, url: Option<&str>) -> Result<NHentaiGallery> {
-		let id = gallery_id(key, url)?;
-		let gallery: NHentaiGallery = request_json(&format!("{API_URL}/galleries/{id}"))?;
-		if gallery.id.to_string() != id || gallery.pages.is_empty() {
-			bail!("nhentai returned incomplete or mismatched gallery data. Try opening the gallery on the source website.");
-		}
-		Ok(gallery)
-	}
-}
-
-impl Source for NHentai {
-	fn new() -> Self {
-		Self {
-			cache: RefCell::new(None),
-		}
-	}
-
-	fn get_search_manga_list(
+	fn search_single(
 		&self,
 		query: Option<String>,
 		page: i32,
@@ -152,6 +136,37 @@ impl Source for NHentai {
 			entries,
 			has_next_page,
 		})
+	}
+
+	fn fetch_gallery(&self, key: &str, url: Option<&str>) -> Result<NHentaiGallery> {
+		let id = gallery_id(key, url)?;
+		let gallery: NHentaiGallery = request_json(&format!("{API_URL}/galleries/{id}"))?;
+		if gallery.id.to_string() != id || gallery.pages.is_empty() {
+			bail!("nhentai returned incomplete or mismatched gallery data. Try opening the gallery on the source website.");
+		}
+		Ok(gallery)
+	}
+}
+
+impl Source for NHentai {
+	fn new() -> Self {
+		Self {
+			cache: RefCell::new(None),
+		}
+	}
+
+	fn get_search_manga_list(
+		&self,
+		query: Option<String>,
+		page: i32,
+		filters: Vec<FilterValue>,
+	) -> Result<MangaPageResult> {
+		if let Some(terms) = multi_search::terms(query.as_deref()) {
+			return multi_search::search(terms, |term| {
+				self.search_single(Some(term), page, filters.clone())
+			});
+		}
+		self.search_single(query, page, filters)
 	}
 
 	fn get_manga_update(
