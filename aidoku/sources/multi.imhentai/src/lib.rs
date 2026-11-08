@@ -336,7 +336,7 @@ impl Source for IMHentai {
 		page: i32,
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
-		if let Some(terms) = multi_search::terms(query.as_deref()) {
+		if multi_search::variants(query.as_deref(), &filters).is_some() {
 			// Mixed results are ordered by date, so search each term by Latest unless a sort was chosen.
 			let mut filters = filters;
 			if !filters
@@ -349,8 +349,9 @@ impl Source for IMHentai {
 					ascending: false,
 				});
 			}
-			return multi_search::search(terms, |term| {
-				Self::search(Some(term), page, filters.clone())
+			let variants = multi_search::variants(query.as_deref(), &filters).unwrap_or_default();
+			return multi_search::search(variants, |(query, filters)| {
+				Self::search(query, page, filters)
 			});
 		}
 		Self::search(query, page, filters)

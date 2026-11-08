@@ -1,7 +1,8 @@
-//! `a | b` searches: each term is searched on its own and the results are merged.
+//! `a | b` searches, in the query or a text filter: each alternative is searched on its own
+//! and the results are merged.
 use aidoku::{
-	MangaPageResult, Result,
-	alloc::{String, Vec},
+	FilterValue, MangaPageResult, Result,
+	alloc::{String, Vec, vec},
 };
 
 /// The separate terms of a query written as `term one | term two`, or `None` for a plain query.
@@ -19,12 +20,62 @@ pub fn terms(query: Option<&str>) -> Option<Vec<String>> {
 	if terms.is_empty() { None } else { Some(terms) }
 }
 
+/// Every combination of the `|` alternatives in the query and in text filters such as Artist,
+/// or `None` when nothing uses `|`. At most `MAX_SEARCHES` combinations are searched.
+pub fn variants(
+	query: Option<&str>,
+	filters: &[FilterValue],
+) -> Option<Vec<(Option<String>, Vec<FilterValue>)>> {
+	let query_terms = terms(query);
+	let split_filters = filters.iter().any(|filter| {
+		matches!(filter, FilterValue::Text { value, .. } if terms(Some(value)).is_some())
+	});
+	if query_terms.is_none() && !split_filters {
+		return None;
+	}
+	let queries: Vec<Option<String>> = match query_terms {
+		Some(terms) => terms.into_iter().map(Some).collect(),
+		None => vec![query.map(String::from)],
+	};
+	let mut combos: Vec<(Option<String>, Vec<FilterValue>)> =
+		queries.into_iter().map(|query| (query, Vec::new())).collect();
+	for filter in filters {
+		let alternatives = match filter {
+			FilterValue::Text { id, value } => match terms(Some(value)) {
+				Some(values) => values
+					.into_iter()
+					.map(|value| FilterValue::Text {
+						id: id.clone(),
+						value,
+					})
+					.collect(),
+				None => vec![filter.clone()],
+			},
+			_ => vec![filter.clone()],
+		};
+		let mut next = Vec::new();
+		for (query, chosen) in &combos {
+			for alternative in &alternatives {
+				let mut chosen = chosen.clone();
+				chosen.push(alternative.clone());
+				next.push((query.clone(), chosen));
+			}
+		}
+		combos = next;
+		combos.truncate(MAX_SEARCHES);
+	}
+	Some(combos)
+}
+
+/// Keeps a search with many `|` alternatives from sending dozens of requests.
+pub const MAX_SEARCHES: usize = 16;
+
 /// Runs every term for the same page and merges the results without duplicates, newest first.
 /// Gallery IDs grow with upload order on these sites, so the ID stands in for the upload date.
 /// A term that fails is skipped unless every term fails.
-pub fn search<F>(terms: Vec<String>, mut run: F) -> Result<MangaPageResult>
+pub fn search<T, F>(terms: Vec<T>, mut run: F) -> Result<MangaPageResult>
 where
-	F: FnMut(String) -> Result<MangaPageResult>,
+	F: FnMut(T) -> Result<MangaPageResult>,
 {
 	let mut results = Vec::new();
 	let mut first_error = None;

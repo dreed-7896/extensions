@@ -161,9 +161,9 @@ impl Source for NHentai {
 		page: i32,
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
-		if let Some(terms) = multi_search::terms(query.as_deref()) {
-			return multi_search::search(terms, |term| {
-				self.search_single(Some(term), page, filters.clone())
+		if let Some(variants) = multi_search::variants(query.as_deref(), &filters) {
+			return multi_search::search(variants, |(query, filters)| {
+				self.search_single(query, page, filters)
 			});
 		}
 		self.search_single(query, page, filters)
