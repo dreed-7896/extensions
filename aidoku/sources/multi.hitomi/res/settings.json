@@ -1,14 +1,92 @@
 [
 	{
 		"type": "group",
+		"title": "Language",
+		"footer": "Limits browsing and search to one language. All matches hitomi.la's own search.",
+		"items": [
+			{
+				"type": "select",
+				"key": "language",
+				"title": "Language",
+				"values": [
+					"all",
+					"en",
+					"id",
+					"jv",
+					"ca",
+					"ceb",
+					"cs",
+					"da",
+					"de",
+					"et",
+					"es",
+					"eo",
+					"fr",
+					"it",
+					"hi",
+					"hu",
+					"pl",
+					"pt",
+					"vi",
+					"tr",
+					"ru",
+					"uk",
+					"ar",
+					"ko",
+					"zh",
+					"ja"
+				],
+				"titles": [
+					"All",
+					"English",
+					"Indonesian",
+					"Javanese",
+					"Catalan",
+					"Cebuano",
+					"Czech",
+					"Danish",
+					"German",
+					"Estonian",
+					"Spanish",
+					"Esperanto",
+					"French",
+					"Italian",
+					"Hindi",
+					"Hungarian",
+					"Polish",
+					"Portuguese",
+					"Vietnamese",
+					"Turkish",
+					"Russian",
+					"Ukrainian",
+					"Arabic",
+					"Korean",
+					"Chinese",
+					"Japanese"
+				],
+				"default": "all",
+				"refreshes": [
+					"content"
+				]
+			}
+		]
+	},
+	{
+		"type": "group",
 		"title": "Title Preferences",
 		"items": [
 			{
 				"type": "select",
 				"key": "titlePreference",
 				"title": "Preferred Title Language",
-				"values": ["english", "japanese"],
-				"titles": ["English", "Japanese"],
+				"values": [
+					"english",
+					"japanese"
+				],
+				"titles": [
+					"English",
+					"Japanese"
+				],
 				"default": "english"
 			}
 		]
