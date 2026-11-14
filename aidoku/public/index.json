@@ -131,9 +131,9 @@
     {
       "id": "multi.hitomi",
       "name": "Hitomi",
-      "version": 6,
-      "iconURL": "icons/multi.hitomi-v6.png",
-      "downloadURL": "sources/multi.hitomi-v6.aix",
+      "version": 7,
+      "iconURL": "icons/multi.hitomi-v7.png",
+      "downloadURL": "sources/multi.hitomi-v7.aix",
       "languages": [
         "multi"
       ],
