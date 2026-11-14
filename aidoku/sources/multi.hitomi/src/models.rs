@@ -3,16 +3,37 @@ use aidoku::{
 	alloc::{String, Vec},
 	prelude::*,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::settings::{TitlePreference, get_title_preference};
+
+/// hitomi.la writes some fields as a string in one gallery and a number in another
+/// (`"galleryid": 123` vs `"123"`, `"female": 1` vs `"1"`). Accept both so a gallery is not dropped.
+fn string_or_number<'de, D: Deserializer<'de>>(deserializer: D) -> core::result::Result<String, D::Error> {
+	#[derive(Deserialize)]
+	#[serde(untagged)]
+	enum Value {
+		Str(String),
+		Int(i64),
+		Float(f64),
+		Bool(bool),
+		Null(()),
+	}
+	Ok(match Value::deserialize(deserializer)? {
+		Value::Str(s) => s,
+		Value::Int(n) => format!("{n}"),
+		Value::Float(n) => format!("{n}"),
+		Value::Bool(b) => if b { "1".into() } else { String::new() },
+		Value::Null(()) => String::new(),
+	})
+}
 
 #[derive(Deserialize, Clone)]
 pub struct HitomiTag {
 	pub tag: String,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "string_or_number")]
 	pub female: String,
-	#[serde(default)]
+	#[serde(default, deserialize_with = "string_or_number")]
 	pub male: String,
 }
 
@@ -59,6 +80,7 @@ impl HitomiFile {
 
 #[derive(Deserialize, Clone)]
 pub struct HitomiLanguage {
+	#[serde(default, deserialize_with = "string_or_number")]
 	pub galleryid: String,
 	pub name: String,
 	#[serde(default)]
@@ -67,6 +89,7 @@ pub struct HitomiLanguage {
 
 #[derive(Deserialize, Clone)]
 pub struct HitomiGallery {
+	#[serde(deserialize_with = "string_or_number")]
 	pub id: String,
 	pub title: String,
 	#[serde(rename = "japanese_title")]
